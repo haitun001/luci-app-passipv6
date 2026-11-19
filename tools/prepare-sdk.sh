@@ -13,7 +13,11 @@ printf '%s  sdk.tar.zst\n' "$expected" | sha256sum -c -
 test -d "${archive%.tar.zst}" || tar --zstd -xf sdk.tar.zst
 cd "${archive%.tar.zst}"
 if [ ! -f feeds/luci/luci.mk ]; then
-	git clone --depth 1 --branch openwrt-25.12 https://github.com/immortalwrt/luci.git feeds/luci
+	luci_commit=ed7692cb08a953e2e503287e0337c8b548cf4ba5
+	curl -fsSL --retry 2 -o "$base/luci.tar.gz" "https://codeload.github.com/immortalwrt/luci/tar.gz/$luci_commit"
+	tar -xzf "$base/luci.tar.gz" -C "$base"
+	mkdir -p feeds
+	mv "$base/luci-$luci_commit" feeds/luci
 fi
 ./scripts/feeds update -i luci
 ./scripts/feeds install -p luci luci-base

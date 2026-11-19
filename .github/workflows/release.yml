@@ -17,6 +17,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -28,7 +29,7 @@ jobs:
         run: |
           python3 tests/static.py
           node --check htdocs/luci-static/resources/view/passipv6.js
-          sh -n tools/install.sh root/usr/libexec/passipv6 root/etc/init.d/passipv6
+          for script in tools/*.sh root/usr/libexec/passipv6 root/etc/init.d/passipv6; do sh -n "$script"; done
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends gettext
           msgfmt --check --check-format -o /dev/null po/zh_Hans/passipv6.po
@@ -39,37 +40,22 @@ jobs:
   build:
     needs: verify
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-      - name: Prepare package feed
+      - name: Prepare official SDK and build plugin packages
         run: |
-          mkdir -p "$RUNNER_TEMP/passipv6-feed/luci-app-passipv6" sdk-output
-          cp -a Makefile htdocs po root "$RUNNER_TEMP/passipv6-feed/luci-app-passipv6/"
-      - name: Build ImmortalWrt 25.12.1 packages
-        uses: openwrt/gh-action-sdk@7fc2640243284ecc44f4a9c3f749a61746ee02cb
-        env:
-          ARCH: x86_64-openwrt-25.12.1
-          CONTAINER: immortalwrt/sdk
-          FEED_DIR: ${{ runner.temp }}/passipv6-feed
-          ARTIFACTS_DIR: ${{ github.workspace }}/sdk-output
-          PACKAGES: luci-app-passipv6
-          V: s
-      - name: Prepare release assets
-        shell: bash
-        run: |
-          version="$(sed -n 's/^PKG_VERSION:=//p' Makefile)"
-          revision="$(sed -n 's/^PKG_RELEASE:=//p' Makefile)"
-          mkdir dist
-          for package in luci-app-passipv6 luci-i18n-passipv6-zh-cn; do
-            mapfile -t files < <(find sdk-output -type f -name "$package-$version-r$revision.apk")
-            test "${#files[@]}" -eq 1
-            cp "${files[0]}" dist/
-          done
-          python3 tools/release.py dist
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential gawk gettext libncurses-dev libssl-dev rsync unzip zstd
+          sudo mkdir -p /opt/passipv6-build
+          sudo chown "$(id -u):$(id -g)" /opt/passipv6-build
+          sh tools/prepare-sdk.sh
+          PASSIPV6_SDK=/opt/passipv6-build/sdk/immortalwrt-sdk-25.12.1-x86-64_gcc-14.3.0_musl.Linux-x86_64 sh tools/build.sh
+          python3 tools/release.py artifacts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: passipv6-release
-          path: dist/*
+          path: artifacts/*
           if-no-files-found: error
           retention-days: 7
 
@@ -77,6 +63,7 @@ jobs:
     if: github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
