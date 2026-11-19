@@ -83,6 +83,10 @@ References:
   installer preflight and public CI releases. Preserve live allowlists on updates.
 - Version 1.0.2-r1 prefers curl when available, with bounded download timeouts;
   verify both downloader paths and the published bootstrap command.
+- Version 1.0.2-r1 is installed on the reference router. The published installer
+  passed a native upgrade and same-version reinstall with the live allowlist
+  preserved. English/Chinese no-change apply announcements, Material-theme axe
+  checks, 320px layout, unrelated rules/configuration and service PIDs were verified.
 - Native packet tests passed in an isolated ImmortalWrt 25.12.1 / 6.12.94 VM:
   IPv4/IPv6, actual DHCPv6 lease allocation, revoking offloaded TCP/UDP, failed
   transactions, repeated applies and unrelated table preservation.

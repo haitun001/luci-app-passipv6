@@ -7,6 +7,24 @@
   installer now prefer curl when available and set explicit download timeouts.
 - Installer tests additionally exercise curl preference, the uclient-fetch path,
   and bootstrap cleanup without executing incomplete downloads.
+- The published one-line command successfully upgraded the reference router from
+  1.0.0-r2 to 1.0.2-r1, then reinstalled the same version. Both runs preserved the
+  populated allowlist and confirmed the active policy. Package checksums matched
+  the [1.0.2 release](https://github.com/haitun001/luci-app-passipv6/releases/tag/1.0.2).
+- Headless Chrome checked the installed Material-theme page in English at 1280px
+  and Simplified Chinese at 320px. Both had zero page-scope axe WCAG 2.2 AA
+  violations and no horizontal page overflow. No-change Save & Apply announced
+  progress followed by the active policy, without unsaved or not-yet-applied
+  announcements. Changed-selection and native apply-event paths have UI regression
+  coverage; the live allowlist was not edited for these checks.
+- The stock login page emitted an unauthenticated `uci/get` request for `luci`
+  with Access denied; this also occurred when opening native Status Overview.
+  Authenticated PassIPV6 checks had no page errors. The login-page issue is
+  recorded separately and was not changed by this work.
+- Before/after checks found unchanged network, DHCP, firewall, proxy and ad-filter
+  configuration hashes, identical fw4 rules and unchanged proxy rule structure
+  after excluding dynamic set members. All nine tracked service processes retained
+  their PIDs and commands. DNS and IPv4 HTTPS checks passed.
 
 ## 1.0.1
 
