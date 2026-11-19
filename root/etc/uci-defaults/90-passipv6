@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+if uci -q get firewall.passipv6 >/dev/null; then
+	[ "$(uci -q get firewall.passipv6.path)" = '/usr/share/passipv6/firewall.include' ] || exit 1
+fi
+uci -q batch <<'EOF'
+set firewall.passipv6=include
+set firewall.passipv6.type='script'
+set firewall.passipv6.path='/usr/share/passipv6/firewall.include'
+set firewall.passipv6.fw4_compatible='1'
+commit firewall
+EOF
+/etc/init.d/passipv6 enable
+/etc/init.d/passipv6 start

@@ -1,0 +1,95 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Allow IPv6"
+msgstr "允许 IPv6"
+
+msgid "Application was cancelled or did not complete."
+msgstr "应用已取消或未完成。"
+
+msgid "Application was cancelled or rolled back."
+msgstr "应用已取消或回滚。"
+
+msgid "Device / MAC address"
+msgstr "设备 / MAC 地址"
+
+msgid "Devices refresh every 5 seconds. Offline allowlist entries are kept."
+msgstr "设备列表每 5 秒刷新，离线设备的白名单会保留。"
+
+msgid "Discovery status"
+msgstr "发现状态"
+
+msgid "IPv4 addresses"
+msgstr "IPv4 地址"
+
+msgid "IPv6 addresses"
+msgstr "IPv6 地址"
+
+msgid "IPv6 protection is active. Allowed devices: %s."
+msgstr "IPv6 白名单保护已生效，允许 %s 台设备。"
+
+msgid "IPv6 protection is not active."
+msgstr "IPv6 白名单保护尚未启用。"
+
+msgid "LAN devices and IPv6 permissions"
+msgstr "局域网设备与 IPv6 权限"
+
+msgid "Lease or saved entry; presence unknown"
+msgstr "租约或已保存设备；在线状态未知"
+
+msgid "No devices have been discovered yet."
+msgstr "暂未发现设备。"
+
+msgid "Not known"
+msgstr "尚未知晓"
+
+msgid "Only selected devices may use IPv6 through this router. IPv4 remains available."
+msgstr "仅勾选的设备可以通过本路由器使用 IPv6，IPv4 仍然可用。"
+
+msgid "Permission denied."
+msgstr "没有操作权限。"
+
+msgid "Recently observed"
+msgstr "近期发现"
+
+msgid "Refresh failed. Your choices have been kept."
+msgstr "刷新失败，已保留你的勾选。"
+
+msgid "Reset"
+msgstr "重置"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save & Apply"
+msgstr "保存并应用"
+
+msgid "Saved. Not yet applied."
+msgstr "已保存，尚未应用。"
+
+msgid "Saving and applying changes…"
+msgstr "正在保存并应用更改…"
+
+msgid "Saving changes…"
+msgstr "正在保存更改…"
+
+msgid "The operation did not complete."
+msgstr "操作未完成。"
+
+msgid "The operation result could not be confirmed."
+msgstr "未能确认操作结果。"
+
+msgid "The policy could not be applied. Check the error below."
+msgstr "规则应用失败，请查看下方错误信息。"
+
+msgid "Unknown device"
+msgstr "未知设备"
+
+msgid "Unsaved changes."
+msgstr "有尚未保存的修改。"
+
+msgid "Unselected devices may still display automatically generated IPv6 addresses. These addresses do not grant IPv6 access through this router."
+msgstr "未勾选的设备仍可能显示自动生成的 IPv6 地址，但不能凭这些地址通过本路由器使用 IPv6。"

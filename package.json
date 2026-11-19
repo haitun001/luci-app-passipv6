@@ -1,0 +1,13 @@
+{
+  "name": "luci-app-passipv6-tests",
+  "private": true,
+  "version": "1.0.1",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node tests/ui.cjs && node tests/installer.cjs"
+  },
+  "devDependencies": {
+    "axe-core": "4.14.1",
+    "jsdom": "31.0.1"
+  }
+}

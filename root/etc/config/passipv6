@@ -1,0 +1,2 @@
+config passipv6 'main'
+	option network 'lan'

@@ -1,0 +1,16 @@
+{
+  "luci-app-passipv6": {
+    "description": "Manage the PassIPV6 MAC allowlist",
+    "read": {
+      "uci": [ "passipv6" ],
+      "ubus": {
+        "luci.passipv6": [ "devices", "status" ],
+        "luci-rpc": [ "getHostHints" ]
+      }
+    },
+    "write": {
+      "uci": [ "passipv6" ],
+      "ubus": { "luci.passipv6": [ "apply" ] }
+    }
+  }
+}

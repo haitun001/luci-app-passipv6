@@ -1,0 +1,8 @@
+#!/bin/sh
+case "$ACTION" in
+	add|remove) ;;
+	*) exit 0 ;;
+esac
+[ -e /etc/config/passipv6 ] || exit 0
+/etc/init.d/passipv6 enabled || exit 0
+/usr/libexec/passipv6 reload

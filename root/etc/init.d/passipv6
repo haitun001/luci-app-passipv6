@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+START=18
+STOP=89
+USE_PROCD=1
+
+start_service() {
+	/usr/libexec/passipv6 reload
+}
+
+reload_service() {
+	/usr/libexec/passipv6 reload
+}
+
+stop_service() {
+	# Stopping trigger registration must not silently remove an active security policy.
+	return 0
+}
+
+service_triggers() {
+	local network
+	config_load passipv6
+	config_get network main network lan
+	procd_add_reload_trigger passipv6 network firewall
+	procd_add_interface_trigger 'interface.*' "$network" /etc/init.d/passipv6 reload
+}

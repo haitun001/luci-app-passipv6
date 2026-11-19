@@ -1,0 +1,16 @@
+import * as policy from 'passipv6';
+import { popen } from 'fs';
+
+return {
+	'luci.passipv6': {
+		devices: { call: function() { return policy.devices(); } },
+		status: { call: function() { return policy.status(); } },
+		apply: { call: function() {
+			let pipe = popen('/usr/libexec/passipv6 reload 2>&1', 'r');
+			if (!pipe) die('Unable to reload PassIPV6');
+			let output = pipe.read('all');
+			let code = pipe.close();
+			return { success: code == 0, message: output, status: policy.status() };
+		} }
+	}
+};
