@@ -43,7 +43,7 @@ Release 的两个 APK，验证 SHA-256，检查实际兼容性，最后核验运
 
 <!-- install-command -->
 ```sh
-( set -eu; d="$(mktemp -d /tmp/passipv6-bootstrap.XXXXXX)"; trap 'rm -rf "$d"' EXIT; uclient-fetch -q -O "$d/install.sh" https://github.com/haitun001/luci-app-passipv6/releases/latest/download/install.sh; sh "$d/install.sh" )
+( set -eu; d="$(mktemp -d /tmp/passipv6-bootstrap.XXXXXX)"; trap 'rm -rf "$d"' EXIT; url=https://github.com/haitun001/luci-app-passipv6/releases/latest/download/install.sh; if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 -o "$d/install.sh" "$url"; else uclient-fetch -q -T 60 -O "$d/install.sh" "$url"; fi; sh "$d/install.sh" )
 ```
 
 完成后刷新 LuCI 页面。应用菜单为 **服务 → PassIPV6**。
@@ -100,7 +100,7 @@ PASSIPV6_SDK=/path/to/immortalwrt-sdk sh tools/build.sh
 ```
 
 CI 对 main 和 PR 执行测试及构建；推送与 `PKG_VERSION` 一致的版本标签，例如
-`1.0.1`，才发布 Release。正式 Release 不覆盖原有版本，修正后递增版本。
+`1.0.2`，才发布 Release。正式 Release 不覆盖原有版本，修正后递增版本。
 构建基线为官方 ImmortalWrt 25.12.1 SDK；依赖仅为原生运行时。
 产物为主 APK、中文 APK、版本固定的安装脚本和 SHA256SUMS。
 

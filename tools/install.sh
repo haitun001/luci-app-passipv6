@@ -25,10 +25,10 @@ apk info -e luci-base rpcd-mod-ucode ucode-mod-fs ucode-mod-uci ucode-mod-ubus i
 ip -j link show >/dev/null || fail 'JSON-capable ip-full is required.'
 
 download() {
-	if command -v uclient-fetch >/dev/null 2>&1; then
-		uclient-fetch -q -O "$2" "$1"
-	elif command -v curl >/dev/null 2>&1; then
-		curl -fsSL --retry 2 -o "$2" "$1"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 -o "$2" "$1"
+	elif command -v uclient-fetch >/dev/null 2>&1; then
+		uclient-fetch -q -T 60 -O "$2" "$1"
 	else
 		fail 'uclient-fetch or curl is required.'
 	fi

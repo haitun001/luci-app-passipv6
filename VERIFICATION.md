@@ -1,5 +1,13 @@
 # Verification
 
+## 1.0.2
+
+- Native uclient-fetch timed out connecting directly to GitHub on the reference
+  router; curl fetched the same release URL successfully. The bootstrap and
+  installer now prefer curl when available and set explicit download timeouts.
+- Installer tests additionally exercise curl preference, the uclient-fetch path,
+  and bootstrap cleanup without executing incomplete downloads.
+
 ## 1.0.1
 
 - UI regression tests cover immediate save/apply announcements, backend confirmation,

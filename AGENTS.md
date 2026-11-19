@@ -81,6 +81,8 @@ References:
 
 - The development baseline is 1.0.0-r2; 1.0.1-r1 adds application-state feedback,
   installer preflight and public CI releases. Preserve live allowlists on updates.
+- Version 1.0.2-r1 prefers curl when available, with bounded download timeouts;
+  verify both downloader paths and the published bootstrap command.
 - Native packet tests passed in an isolated ImmortalWrt 25.12.1 / 6.12.94 VM:
   IPv4/IPv6, actual DHCPv6 lease allocation, revoking offloaded TCP/UDP, failed
   transactions, repeated applies and unrelated table preservation.

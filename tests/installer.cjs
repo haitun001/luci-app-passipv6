@@ -9,6 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, '../tools/install.sh'), 'utf
   .replaceAll('@VERSION@', '1.0.1').replaceAll('@REVISION@', '1');
 const digest = createHash('sha256').update('package').digest('hex');
 const stubs = `
+command() { if [ "$CASE" = uclient ] && [ "$1" = -v ] && [ "$2" = curl ]; then return 1; fi; builtin command "$@"; }
 id() { if [ "$CASE" = nonroot ]; then echo 1000; else echo 0; fi; }
 ubus() { printf '{}'; }
 jsonfilter() {
@@ -24,22 +25,34 @@ fw4() { return 0; }
 ip() { return 0; }
 uci() { [ -f "$CASE_ROOT/config" ] && cat "$CASE_ROOT/config"; }
 mktemp() { command mktemp -d "$CASE_ROOT/work.XXXXXX"; }
-uclient-fetch() {
- [ "$1" = -q ] && [ "$2" = -O ] || return 1
- printf '%s\\n' "$4" >> "$CASE_ROOT/downloads"
- case "$4" in
+fixture_download() {
+ printf '%s\\n' "$1" >> "$CASE_ROOT/downloads"
+ case "$1" in
+  https://github.com/haitun001/luci-app-passipv6/releases/latest/download/install.sh)
+   printf 'printf executed > "$CASE_ROOT/bootstrap-executed"\n' > "$2"
+   ;;
   https://github.com/haitun001/luci-app-passipv6/releases/download/1.0.1/SHA256SUMS)
-   printf '%s  %s\\n' '${digest}' luci-app-passipv6-1.0.1-r1.apk > "$3"
-   if [ "$CASE" = duplicate ]; then printf '%s  %s\\n' '${digest}' luci-app-passipv6-1.0.1-r1.apk >> "$3"; fi
-   if [ "$CASE" != missing ]; then printf '%s  %s\\n' '${digest}' luci-i18n-passipv6-zh-cn-1.0.1-r1.apk >> "$3"; fi
+   printf '%s  %s\\n' '${digest}' luci-app-passipv6-1.0.1-r1.apk > "$2"
+   if [ "$CASE" = duplicate ]; then printf '%s  %s\\n' '${digest}' luci-app-passipv6-1.0.1-r1.apk >> "$2"; fi
+   if [ "$CASE" != missing ]; then printf '%s  %s\\n' '${digest}' luci-i18n-passipv6-zh-cn-1.0.1-r1.apk >> "$2"; fi
    ;;
   https://github.com/haitun001/luci-app-passipv6/releases/download/1.0.1/luci-app-passipv6-1.0.1-r1.apk|https://github.com/haitun001/luci-app-passipv6/releases/download/1.0.1/luci-i18n-passipv6-zh-cn-1.0.1-r1.apk)
-   printf package > "$3"
-   if [ "$CASE" = checksum ]; then printf corrupt >> "$3"; fi
+   printf package > "$2"
+   if [ "$CASE" = checksum ]; then printf corrupt >> "$2"; fi
    ;;
   *) return 1 ;;
  esac
  [ "$CASE" != download ]
+}
+curl() {
+ [ "$1" = -fsSL ] && [ "$4" = --connect-timeout ] && [ "$5" = 10 ] && [ "$6" = --max-time ] && [ "$7" = 60 ] && [ "$8" = -o ] || return 1
+ printf 'curl\\n' >> "$CASE_ROOT/transport"
+ fixture_download "\${10}" "$9"
+}
+uclient-fetch() {
+ [ "$1" = -q ] && [ "$2" = -T ] && [ "$3" = 60 ] && [ "$4" = -O ] || return 1
+ printf 'uclient\\n' >> "$CASE_ROOT/transport"
+ fixture_download "$6" "$5"
 }
 apk() {
  case "$1" in
@@ -65,7 +78,7 @@ ucode() {
 }
 `;
 
-for (const scenario of ['new', 'upgrade', 'repeat', 'future', 'nonroot', 'distro', 'arch', 'snapshot', 'old', 'dependencies', 'duplicate', 'missing', 'checksum', 'download', 'capability', 'solve', 'install', 'inactive']) {
+for (const scenario of ['new', 'upgrade', 'repeat', 'future', 'uclient', 'nonroot', 'distro', 'arch', 'snapshot', 'old', 'dependencies', 'duplicate', 'missing', 'checksum', 'download', 'capability', 'solve', 'install', 'inactive']) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'passipv6-install-test-'));
   try {
     const installer = path.join(root, 'install.sh');
@@ -78,7 +91,7 @@ for (const scenario of ['new', 'upgrade', 'repeat', 'future', 'nonroot', 'distro
     });
     const result = run();
     assert.ifError(result.error);
-    const success = ['new', 'upgrade', 'repeat', 'future'].includes(scenario);
+    const success = ['new', 'upgrade', 'repeat', 'future', 'uclient'].includes(scenario);
     assert.equal(result.status === 0, success, scenario + ': ' + result.stderr);
     assert.equal(fs.readFileSync(path.join(root, 'unrelated.apk'), 'utf8'), 'keep');
     assert(!fs.readdirSync(root).some(name => name.startsWith('work.')), scenario + ': leaked temp directory');
@@ -87,6 +100,7 @@ for (const scenario of ['new', 'upgrade', 'repeat', 'future', 'nonroot', 'distro
     assert.equal(order.includes('install'), success || ['install', 'inactive'].includes(scenario));
     if (success) {
       assert.deepEqual(order, ['extract', 'check', 'simulate', 'install', 'status']);
+      assert.equal(fs.readFileSync(path.join(root, 'transport'), 'utf8'), (scenario === 'uclient' ? 'uclient\n' : 'curl\n').repeat(3));
       assert.equal(fs.readFileSync(path.join(root, 'program'), 'utf8'), '1.0.1-r1');
     }
     if (scenario === 'repeat') {
@@ -99,4 +113,21 @@ for (const scenario of ['new', 'upgrade', 'repeat', 'future', 'nonroot', 'distro
     fs.rmSync(root, { recursive: true, force: true });
   }
 }
-console.log('PASS: installer compatibility, exact assets/checksums, failed downloads/installs, upgrades, repeat installs and isolated cleanup');
+const bootstrap = fs.readFileSync(path.join(__dirname, '../README.md'), 'utf8')
+  .split('<!-- install-command -->\n```sh\n')[1].split('\n```')[0];
+for (const scenario of ['new', 'uclient', 'download']) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'passipv6-bootstrap-test-'));
+  try {
+    const result = spawnSync('bash', ['-c', stubs + '\n' + bootstrap], {
+      env: { ...process.env, CASE: scenario, CASE_ROOT: root }, encoding: 'utf8'
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status === 0, scenario !== 'download', result.stderr);
+    assert.equal(fs.existsSync(path.join(root, 'bootstrap-executed')), scenario !== 'download');
+    assert.equal(fs.readFileSync(path.join(root, 'transport'), 'utf8'), scenario === 'uclient' ? 'uclient\n' : 'curl\n');
+    assert(!fs.readdirSync(root).some(name => name.startsWith('work.')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+console.log('PASS: downloader selection, bootstrap, compatibility, exact assets/checksums, failed downloads/installs, upgrades, repeat installs and isolated cleanup');
