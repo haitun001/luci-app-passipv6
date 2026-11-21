@@ -22,6 +22,14 @@
   helper commit failure with rollback, altered guard detection, helper failure
   and procd recovery passed. Program file changes replaced the helper while
   preserving the policy. Reboot recovered active filtering and RA delivery.
+- CI-built packages passed native reinstall with the populated allowlist intact.
+  Uninstall removed the owned tables/include and left fw4 unchanged; reinstall
+  after removal restored active filtering and RA delivery.
+- Native Bootstrap LuCI passed page-scope axe WCAG 2.2 AA checks in English at
+  1280px and Simplified Chinese at 320px, without horizontal overflow. Save-only
+  retained the active policy; changed-selection Save & Apply confirmed the new
+  allowlist after native reload. No-change apply immediately announced progress
+  and then the active policy, without an intervening unsaved/save-only message.
 - Real iOS reconnection, DNS selection, sleep/wake and application behavior remain
   unverified. Linux tests and successful installation do not establish iOS
   acceptance. Production deployment evidence is recorded separately after rollout.

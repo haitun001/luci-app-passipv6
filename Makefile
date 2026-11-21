@@ -21,7 +21,6 @@ define Package/luci-app-passipv6/prerm
 if [ -z "$$IPKG_INSTROOT" ]; then
     /etc/init.d/passipv6 disable
     /usr/libexec/passipv6 remove || exit 1
-    /etc/init.d/passipv6 stop
 fi
 exit 0
 endef
