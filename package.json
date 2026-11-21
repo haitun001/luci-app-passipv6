@@ -1,7 +1,7 @@
 {
   "name": "luci-app-passipv6-tests",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "license": "Apache-2.0",
   "scripts": {
     "test": "node tests/ui.cjs && node tests/installer.cjs"

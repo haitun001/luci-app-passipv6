@@ -7,4 +7,6 @@ fi
 mount --make-rprivate /
 mkdir -p /run/netns
 mount -t tmpfs tmpfs /run/netns
+mkdir -p /var/run/passipv6
+mount -t tmpfs tmpfs /var/run/passipv6
 exec python3 "$project/tests/network.py"

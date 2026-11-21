@@ -29,9 +29,11 @@ jobs:
         run: |
           python3 tests/static.py
           node --check htdocs/luci-static/resources/view/passipv6.js
-          for script in tools/*.sh root/usr/libexec/passipv6 root/etc/init.d/passipv6; do sh -n "$script"; done
+          for script in tools/*.sh root/usr/libexec/passipv6 root/etc/init.d/passipv6 root/usr/share/passipv6/daemon.sh; do sh -n "$script"; done
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gettext
+          sudo apt-get install -y --no-install-recommends gettext libjson-c-dev
+          cc -D_GNU_SOURCE -Wall -Wextra -Werror -fsanitize=address,undefined tests/ra.c -ljson-c -o /tmp/passipv6-ra-test
+          /tmp/passipv6-ra-test
           msgfmt --check --check-format -o /dev/null po/zh_Hans/passipv6.po
           version="$(sed -n 's/^PKG_VERSION:=//p' Makefile)"
           grep -Fxq "## $version" CHANGELOG.md

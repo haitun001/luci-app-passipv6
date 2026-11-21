@@ -4,6 +4,12 @@ msgstr ""
 "Language: zh_Hans\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "After upgrading or changing IPv6 permissions, reconnect affected devices once to refresh their network settings."
+msgstr "升级或更改 IPv6 权限后，请将受影响的设备断开并重新连接一次，以刷新网络设置。"
+
+msgid "IPv6 network settings could not be applied."
+msgstr "IPv6 网络设置未能生效。"
+
 msgid "Allow IPv6"
 msgstr "允许 IPv6"
 

@@ -74,6 +74,7 @@ return view.extend({
 			E('h2', {}, 'PassIPV6'),
 			E('p', { 'id': 'passipv6-description' }, _('Only selected devices may use IPv6 through this router. IPv4 remains available.')),
 			E('p', {}, _('Unselected devices may still display automatically generated IPv6 addresses. These addresses do not grant IPv6 access through this router.')),
+			E('p', {}, _('After upgrading or changing IPv6 permissions, reconnect affected devices once to refresh their network settings.')),
 			E('p', {}, _('Devices refresh every 5 seconds. Offline allowlist entries are kept.')),
 			this.message, this.error, table, this.empty
 		]);
@@ -178,7 +179,7 @@ return view.extend({
 		this.lastStatus = status;
 		if (this.operation && this.operation.kind === 'apply' && this.operation.committed) {
 			if (status.error) { this.finishOperation(status.error); return; }
-			if (status.active && status.applied && JSON.stringify(this.operation.target) === JSON.stringify(macList(status.mac))) {
+			if (status.active && status.applied && status.ra_ready !== false && JSON.stringify(this.operation.target) === JSON.stringify(macList(status.mac))) {
 				this.finishOperation();
 				return;
 			}
@@ -189,6 +190,7 @@ return view.extend({
 		else if (this.actionError) text = _('The operation did not complete.');
 		else if (JSON.stringify(selected) !== JSON.stringify(this.saved)) text = _('Unsaved changes.');
 		else if (status.error) text = _('The policy could not be applied. Check the error below.');
+		else if (status.ra_ready === false) text = _('IPv6 network settings could not be applied.');
 		else if (!status.active) text = _('IPv6 protection is not active.');
 		else if (!status.applied || JSON.stringify(selected) !== JSON.stringify(macList(status.mac)))
 			text = _('Saved. Not yet applied.');

@@ -21,4 +21,11 @@ if [ ! -f feeds/luci/luci.mk ]; then
 fi
 ./scripts/feeds update -i luci
 ./scripts/feeds install -p luci luci-base
+if [ ! -f package/libs/libjson-c/Makefile ]; then
+	base_commit=a3378d1a2c15beb2faf4b0bce9c00f07143efa29
+	curl -fsSL --retry 2 -o "$base/base.tar.gz" "https://codeload.github.com/immortalwrt/immortalwrt/tar.gz/$base_commit"
+	tar -xzf "$base/base.tar.gz" -C "$base" "immortalwrt-$base_commit/package/libs/libjson-c"
+	mkdir -p package/libs
+	cp -r "$base/immortalwrt-$base_commit/package/libs/libjson-c" package/libs/
+fi
 printf 'SDK ready: %s\n' "$PWD"

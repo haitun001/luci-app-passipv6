@@ -12,3 +12,4 @@ commit firewall
 EOF
 /etc/init.d/passipv6 enable
 /etc/init.d/passipv6 start
+/usr/libexec/passipv6 reload

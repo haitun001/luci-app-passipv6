@@ -7,10 +7,12 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NAMES = ['p6r', 'p6a', 'p6b', 'p6w']
+NAMES = ['p6r', 'p6ap', 'p6a', 'p6b', 'p6w']
 WHITE = '02:00:00:00:00:0a'
 BLACK = '02:00:00:00:00:0b'
-CONTEXT = {'bridge': 'br-lan', 'ports': ['la', 'lb'], 'devices': ['br-lan', 'la', 'lb']}
+CONTEXT = {'bridge': 'br-lan', 'ports': ['la'], 'devices': ['br-lan', 'la']}
+HELPER = '/usr/libexec/passipv6-ra'
+GENERATION = 0
 
 
 def run(args, ns=None, check=True, **kwargs):
@@ -27,10 +29,18 @@ def nft(text):
 
 
 def policy(macs):
+    global GENERATION
+    GENERATION += 1
+    snapshot = json.dumps({'bridge': 'br-lan', 'mac': sorted(macs), 'generation': GENERATION})
+    pathlib.Path('/var/run/passipv6/ra-candidate.json').write_text(snapshot)
+    run([HELPER, 'prepare'], 'p6r')
     rendered = run(['sh', str(ROOT / 'tests/ucode.sh'), str(ROOT / 'tests/render.uc'),
                     json.dumps({'network': 'lan', 'mac': macs}), json.dumps(CONTEXT)]).stdout
     run(['nft', '-c', '-f', '-'], 'p6r', input=rendered)
     nft(rendered)
+    pathlib.Path('/var/run/passipv6/ra-active.json').write_text(snapshot)
+    run([HELPER, 'commit'], 'p6r')
+    assert json.loads(run([HELPER, 'status'], 'p6r').stdout)['ready']
 
 
 def ping(ns, address, success=True):
@@ -47,9 +57,9 @@ def wait_for_traffic(path):
     raise AssertionError('The test stream did not become ready')
 
 
-def connect(router_port, ns, address4, address6, mac=None):
+def connect(router_port, ns, address4, address6, mac=None, router_ns='p6r'):
     run(['ip', 'link', 'add', router_port, 'type', 'veth', 'peer', 'name', router_port + 'p'])
-    run(['ip', 'link', 'set', router_port, 'netns', 'p6r'])
+    run(['ip', 'link', 'set', router_port, 'netns', router_ns])
     run(['ip', 'link', 'set', router_port + 'p', 'netns', ns])
     run(['ip', 'link', 'set', router_port + 'p', 'name', 'eth0'], ns)
     if mac:
@@ -57,7 +67,80 @@ def connect(router_port, ns, address4, address6, mac=None):
     run(['ip', 'link', 'set', 'eth0', 'up'], ns)
     run(['ip', 'addr', 'add', address4, 'dev', 'eth0'], ns)
     run(['ip', '-6', 'addr', 'add', address6, 'dev', 'eth0', 'nodad'], ns)
-    run(['ip', 'link', 'set', router_port, 'up'], 'p6r')
+    run(['ip', 'link', 'set', router_port, 'up'], router_ns)
+
+
+def router_advertisements():
+    send = '''import socket,struct
+idx=socket.if_nametoindex('br-lan')
+s=socket.socket(socket.AF_INET6,socket.SOCK_RAW,socket.IPPROTO_ICMPV6)
+s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_MULTICAST_IF,idx)
+s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_MULTICAST_HOPS,255)
+ra=struct.pack('!BBHBBHII',134,0,0,64,0,12,0,0)
+ra+=struct.pack('!BBBBIII16s',3,4,64,192,90,60,0,socket.inet_pton(socket.AF_INET6,'fd44::'))
+ra+=struct.pack('!BBHI16s',25,3,0,12,socket.inet_pton(socket.AF_INET6,'fd42::1'))
+s.sendto(ra,('ff02::1',0,0,idx))
+'''
+    receive = '''import socket,time,json
+s=socket.socket(socket.AF_INET6,socket.SOCK_RAW,socket.IPPROTO_ICMPV6)
+s.settimeout(.1); print('READY',flush=True)
+end=time.monotonic()+2; frames=[]
+while time.monotonic()<end:
+ try:
+  data,peer=s.recvfrom(4096)
+  if data[0]==134: frames.append(data.hex())
+ except TimeoutError: pass
+print(json.dumps(frames),flush=True)
+'''
+
+    def observe():
+        readers = [subprocess.Popen(['ip', 'netns', 'exec', ns, 'python3', '-c', receive],
+                   text=True, stdout=subprocess.PIPE) for ns in ['p6a', 'p6b']]
+        try:
+            for reader in readers:
+                assert reader.stdout.readline().strip() == 'READY'
+            run(['python3', '-c', send], 'p6r')
+            return [json.loads(reader.communicate(timeout=5)[0]) for reader in readers]
+        finally:
+            for reader in readers:
+                if reader.poll() is None:
+                    reader.terminate()
+                reader.wait(timeout=5)
+
+    def ra_default(ns):
+        return any(r.get('dst') == 'default' and r.get('protocol') == 'ra'
+                   for r in json.loads(run(['ip', '-6', '-j', 'route'], ns).stdout))
+
+    policy([WHITE])
+    allowed, denied = observe()
+    assert len(allowed) == 1 and denied == [], (allowed, denied)
+    frame = bytes.fromhex(allowed[0])
+    assert frame[16:20] == bytes([3, 4, 64, 192]) and frame[48:50] == bytes([25, 3])
+    assert int.from_bytes(frame[52:56], 'big') == 12, 'RDNSS lifetime must remain unchanged'
+    assert ra_default('p6a') and not ra_default('p6b')
+    for _ in range(6):
+        time.sleep(4)
+        run(['python3', '-c', send], 'p6r')
+        assert ra_default('p6a') and not ra_default('p6b')
+    print('PASS: one shared AP uplink delivers RA/PIO/RDNSS only to the allowlist; route renewal survives two lifetimes', flush=True)
+
+    # Even a stale helper snapshot must not bypass the kernel destination filter.
+    stale = {'bridge': 'br-lan', 'mac': [WHITE, BLACK], 'generation': 999}
+    pathlib.Path('/var/run/passipv6/ra-candidate.json').write_text(json.dumps(stale))
+    run([HELPER, 'prepare'], 'p6r')
+    run([HELPER, 'commit'], 'p6r')
+    allowed, denied = observe()
+    assert len(allowed) == 1 and denied == []
+    print('PASS: bridge egress blocks a stale helper from advertising IPv6 to a removed MAC', flush=True)
+
+    policy([])
+    run(['ip', 'link', 'set', 'eth0', 'down'], 'p6a')
+    run(['ip', 'link', 'set', 'eth0', 'up'], 'p6a')
+    time.sleep(1.2)
+    allowed, denied = observe()
+    assert allowed == denied == []
+    assert not ra_default('p6a') and not ra_default('p6b')
+    print('PASS: empty allowlist and reconnect leave clients without advertised IPv6 routes or DNS', flush=True)
 
 
 def dhcpv6(tmp, processes):
@@ -140,10 +223,18 @@ def main():
         run(['ip', 'link', 'set', 'br-lan', 'up'], 'p6r')
         run(['ip', 'addr', 'add', '192.0.2.1/24', 'dev', 'br-lan'], 'p6r')
         run(['ip', '-6', 'addr', 'add', 'fd42::1/64', 'dev', 'br-lan', 'nodad'], 'p6r')
-        connect('la', 'p6a', '192.0.2.10/24', 'fd42::10/64', WHITE)
-        connect('lb', 'p6b', '192.0.2.11/24', 'fd42::11/64', BLACK)
+        run(['ip', 'link', 'add', 'br-ap', 'type', 'bridge'], 'p6ap')
+        run(['ip', 'link', 'set', 'br-ap', 'up'], 'p6ap')
+        run(['ip', 'link', 'add', 'la', 'type', 'veth', 'peer', 'name', 'ap-up'], 'p6r')
+        run(['ip', 'link', 'set', 'ap-up', 'netns', 'p6ap'], 'p6r')
+        run(['ip', 'link', 'set', 'la', 'up'], 'p6r')
+        run(['ip', 'link', 'set', 'ap-up', 'up'], 'p6ap')
+        connect('ap-a', 'p6a', '192.0.2.10/24', 'fd42::10/64', WHITE, 'p6ap')
+        connect('ap-b', 'p6b', '192.0.2.11/24', 'fd42::11/64', BLACK, 'p6ap')
         connect('wan', 'p6w', '198.51.100.2/24', 'fd43::2/64')
-        for port in ['la', 'lb']:
+        for port in ['ap-up', 'ap-a', 'ap-b']:
+            run(['ip', 'link', 'set', port, 'master', 'br-ap'], 'p6ap')
+        for port in ['la']:
             run(['ip', 'link', 'set', port, 'master', 'br-lan'], 'p6r')
         run(['ip', 'addr', 'add', '198.51.100.1/24', 'dev', 'wan'], 'p6r')
         run(['ip', '-6', 'addr', 'add', 'fd43::1/64', 'dev', 'wan', 'nodad'], 'p6r')
@@ -164,6 +255,7 @@ def main():
         ''')
         baseline = run(['nft', '-s', 'list', 'table', 'inet', 'fw4'], 'p6r').stdout
         passwall = run(['nft', '-s', 'list', 'table', 'inet', 'passwall'], 'p6r').stdout
+        processes.append(subprocess.Popen(['ip', 'netns', 'exec', 'p6r', HELPER, 'daemon']))
         # Let IPv6 multicast memberships and link-local DAD settle on new veth devices.
         time.sleep(2)
         ping('p6w', 'fd43::1')
@@ -236,6 +328,7 @@ while time.monotonic()<end:
             assert baseline == run(['nft', '-s', 'list', 'table', 'inet', 'fw4'], 'p6r').stdout
             assert passwall == run(['nft', '-s', 'list', 'table', 'inet', 'passwall'], 'p6r').stdout
             print('PASS: empty policy, repeat apply and unrelated firewall tables', flush=True)
+            router_advertisements()
     except Exception:
         for ns in ['p6a', 'p6r', 'p6w']:
             for command in [['ip', '-6', 'route'], ['ip', '-6', 'neigh'], ['nft', 'list', 'ruleset']]:

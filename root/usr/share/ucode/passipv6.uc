@@ -6,6 +6,7 @@ import { connect } from 'ubus';
 
 const runDir = '/var/run/passipv6';
 const checkpoint = '/etc/passipv6/last-good.json';
+const raActive = runDir + '/ra-active.json';
 
 function normalizeMac(value) {
 	if (type(value) != 'string' || !match(value, /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/))
@@ -75,6 +76,10 @@ function checkOffload(context, ruleset, hardware) {
 
 function context(config) {
 	let uci = cursor();
+	uci.foreach('dhcp', 'dhcp', section => {
+		if (section.interface == config.network && (section.ra == 'relay' || section.ra == 'hybrid'))
+			die('RA relay and hybrid modes are not supported');
+	});
 	let bridge = safeInterface(uci.get('network', config.network, 'device'));
 	let definition;
 	uci.foreach('network', 'device', section => {
@@ -128,6 +133,7 @@ table bridge passipv6 {
     }
     chain lan_postrouting {
         type filter hook postrouting priority 310; policy accept;
+        oifname @lan_ports ether type ip6 meta l4proto ipv6-icmp icmpv6 type nd-router-advert ether daddr & 01:00:00:00:00:00 != 00:00:00:00:00:00 counter drop comment "passipv6-ra-guard"
         oifname @lan_ports ether type ip6 ether daddr & 01:00:00:00:00:00 == 00:00:00:00:00:00 ether daddr != @allowed_macs counter drop
     }
 }
@@ -143,7 +149,9 @@ function writeAtomic(path, data) {
 		die('Unable to persist state');
 }
 
-function check() {
+function check(helper) {
+	helper ??= '/usr/libexec/passipv6-ra';
+	if (!match(helper, /^\/[a-zA-Z0-9_./-]+$/)) die('Invalid RA helper path');
 	let config = fs.stat('/etc/config/passipv6') ? readConfig() : { network: 'lan', mac: [] };
 	let ctx = context(config);
 	if (index(ctx.devices, ctx.bridge) < 0 || !length(ctx.ports))
@@ -155,6 +163,12 @@ function check() {
 	let code = pipe.close();
 	if (written != length(rules) || code != 0)
 		die('The kernel or nftables does not support the required IPv6 filtering rules');
+	pipe = fs.popen(`'${helper}' check`, 'w');
+	if (!pipe) die('Unable to check RA delivery support');
+	let snapshot = sprintf('%J', { bridge: ctx.bridge, mac: config.mac, generation: 1 });
+	written = pipe.write(snapshot);
+	code = pipe.close();
+	if (written != length(snapshot) || code != 0) die('Native RA capture is not supported');
 	return true;
 }
 
@@ -179,6 +193,38 @@ function tableMacs(table) {
 
 function same(a, b) { return sprintf('%J', a) == sprintf('%J', b); }
 
+function raCommand(action) {
+	if (index(['prepare', 'commit', 'abort', 'restore', 'clear', 'status'], action) < 0)
+		die('Invalid RA service operation');
+	let pipe = fs.popen(`/usr/libexec/passipv6-ra ${action}`, 'r');
+	if (!pipe) die('RA service is unavailable');
+	let output = pipe.read('all'), code = pipe.close(), result;
+	try { result = json(output); } catch (e) { die('Invalid RA service response'); }
+	if (code != 0 || !result.success) die(result.error ?? 'RA service operation failed');
+	return result;
+}
+
+function raStatus() {
+	try { return raCommand('status'); }
+	catch (e) { return { ready: false, error: e.message }; }
+}
+
+function raGuard(table) {
+	for (let entry in table?.nftables ?? []) {
+		let rule = entry.rule;
+		if (rule?.chain != 'lan_postrouting' || rule.comment != 'passipv6-ra-guard') continue;
+		let expr = filter(rule.expr ?? [], item => item.counter == null);
+		// nft JSON omits the protocol dependencies already implied by icmpv6 type.
+		return same(expr, [
+			{ match: { op: '==', left: { meta: { key: 'oifname' } }, right: '@lan_ports' } },
+			{ match: { op: '==', left: { payload: { protocol: 'icmpv6', field: 'type' } }, right: 'nd-router-advert' } },
+			{ match: { op: '!=', left: { '&': [{ payload: { protocol: 'ether', field: 'daddr' } }, '01:00:00:00:00:00'] }, right: '00:00:00:00:00:00' } },
+			{ drop: null }
+		]);
+	}
+	return false;
+}
+
 function reload() {
 	fs.mkdir(runDir, 0700);
 	fs.mkdir('/etc/passipv6', 0700);
@@ -196,19 +242,52 @@ function reload() {
 		config = normalizeConfig(previous ?? { network: 'lan', mac: [] });
 		ctx = context(config);
 	}
+	let oldState = readJSON(runDir + '/status.json') ?? {};
+	let oldRa = fs.readfile(raActive);
+	let rollback = 'destroy table inet passipv6\ndestroy table bridge passipv6\n';
+	for (let family in ['inet', 'bridge'])
+		if (ownTable(family)) rollback += command(`/usr/sbin/nft -s list table ${family} passipv6`);
+	let installed = false, checkpointChanged = false;
 	try {
-		// Prepare durable recovery data before changing packet filtering.
+		// Install the multicast guard even when netifd has not created the bridge yet.
+		if (index(ctx.devices, ctx.bridge) < 0) {
+			if (!ownTable('inet') || !ownTable('bridge')) nftApply(renderRules(config, ctx));
+			die('The managed LAN bridge is not available yet');
+		}
 		let changed = !same(previous, config);
 		if (changed) writeAtomic(checkpoint + '.pending', sprintf('%J', config));
+		let snapshot = { bridge: ctx.bridge, mac: config.mac, generation: (readJSON(raActive)?.generation ?? 0) + 1 };
+		writeAtomic(runDir + '/ra-candidate.json', sprintf('%J', snapshot));
+		raCommand('prepare');
 		nftApply(renderRules(config, ctx));
+		installed = true;
+		writeAtomic(raActive, sprintf('%J', snapshot));
+		raCommand('commit');
+		let ready = raStatus();
+		if (!ready.ready || !same(ready.config, snapshot)) die('RA delivery could not be confirmed');
 		if (changed && !fs.rename(checkpoint + '.pending', checkpoint))
 			die('Policy is active but recovery state could not be committed');
+		checkpointChanged = changed;
 		writeAtomic(runDir + '/status.json', sprintf('%J', {
 			error: failure ?? null, applied_at: time(), context: ctx
 		}));
 	} catch (e) {
-		writeAtomic(runDir + '/status.json', sprintf('%J', { error: e.message }));
-		die(e.message);
+		let message = e.message;
+		try { raCommand('abort'); } catch (ignored) {}
+		if (installed) {
+			try {
+				nftApply(rollback);
+				if (oldRa != null) { writeAtomic(raActive, oldRa); raCommand('restore'); }
+				else { fs.unlink(raActive); raCommand('clear'); }
+				if (checkpointChanged) {
+					if (previous != null) writeAtomic(checkpoint, sprintf('%J', previous));
+					else fs.unlink(checkpoint);
+				}
+			} catch (recovery) { message += '; recovery failed: ' + recovery.message; }
+		}
+		oldState.error = message;
+		writeAtomic(runDir + '/status.json', sprintf('%J', oldState));
+		die(message);
 	}
 	if (failure) die(failure);
 	return true;
@@ -216,6 +295,8 @@ function reload() {
 
 function remove() {
 	fs.mkdir(runDir, 0700);
+	fs.unlink(raActive);
+	try { raCommand('clear'); } catch (ignored) {}
 	nftApply('destroy table inet passipv6\ndestroy table bridge passipv6\n');
 	let uci = cursor();
 	if (uci.get('firewall', 'passipv6', 'path') == '/usr/share/passipv6/firewall.include') {
@@ -237,11 +318,16 @@ function status() {
 	let ruleCount = table => length(filter(table?.nftables ?? [], entry => entry.rule != null));
 	let live = ctx && index(ctx.devices, ctx.bridge) >= 0;
 	let active = live && chainCount(inet) == 2 && ruleCount(inet) == 2 &&
-		chainCount(bridge) == 2 && ruleCount(bridge) == 2 &&
+		chainCount(bridge) == 2 && ruleCount(bridge) == 3 && raGuard(bridge) &&
 		imac != null && same(imac, bmac) && same(imac, last?.mac);
+	let ra = raStatus(), snapshot = readJSON(raActive);
+	let raReady = !!(ra.ready && snapshot && same(ra.config, snapshot) &&
+		snapshot.bridge == ctx?.bridge && same(snapshot.mac, imac));
+	if (!error && !raReady) error = ra.error ?? 'Router advertisement delivery is not ready';
 	return {
 		active: !!active,
-		applied: !!(active && !error && same(config, last) && same(ctx, state.context)),
+		ra_ready: raReady,
+		applied: !!(active && raReady && !error && same(config, last) && same(ctx, state.context)),
 		mac: imac ?? [], network: config?.network ?? last?.network ?? 'lan',
 		error: error ?? null, applied_at: state.applied_at ?? null
 	};

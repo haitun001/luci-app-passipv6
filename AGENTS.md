@@ -6,9 +6,13 @@ Develop a native LuCI IPv6 MAC allowlist. Preserve existing device configuration
 during deployments. Never store credentials or private deployment details in this
 public repository, artifacts, logs, or documentation.
 
-The accepted policy retains SLAAC compatibility: unlisted clients cannot use IPv6
-through this router or obtain DHCPv6 leases. They may still display SLAAC and
-link-local addresses. Traffic switched entirely downstream is outside this control.
+The policy retains SLAAC for allowed clients: native router advertisements are
+delivered to allowlisted Ethernet addresses, and original multicast RAs are blocked.
+Unlisted clients cannot use IPv6 through this router or obtain DHCPv6 leases.
+Previously learned SLAAC and self-generated link-local addresses may remain.
+Reconnect affected clients once after upgrade or permission changes to refresh
+cached routes and DNS; real iOS behavior requires explicit acceptance testing.
+Traffic switched entirely downstream is outside this control.
 Initial policy is enabled with an empty allowlist. IPv4 remains available.
 
 ## Confirmed target
@@ -17,6 +21,9 @@ Initial policy is enabled with an empty allowlist. IPv4 remains available.
 - The reference topology is logical network `lan` and bridge `br-lan` with Ethernet
   members. Derive names from UCI and sysfs, never hardcode a deployment's ports.
 - Preserve the existing odhcpd RA/SLAAC and DHCPv6 settings.
+- Use locally generated RAs only. RA relay/hybrid modes are explicitly unsupported.
+- Keep the existing subnet and pure AP layout. Do not introduce VLANs, SSIDs or
+  separate address ranges as a workaround.
 - Software flow offload is enabled on br-lan and WAN devices; hardware offload is
   disabled. LAN bridge ports are not registered directly in the flowtable.
 - Passwall, passwall-ai-ipv6-fix, adblock-fast, dnsmasq and miniupnpd coexist.
@@ -38,6 +45,10 @@ Initial policy is enabled with an empty allowlist. IPv4 remains available.
   ports require an explicit unsupported-state error, not a silent security downgrade.
 - Apply both tables in one nft transaction after `nft --check`. Serialize writers.
   Failure retains the active rules. Keep a validated last-good policy for recovery.
+- Prepare the native RA helper before applying rules, then confirm its active
+  snapshot before reporting success. Roll back helper activation failures.
+  Helper failure must never remove the multicast guard. The root-only local
+  control socket does not add RPC write privileges.
 - Ordinary Save & Apply reloads only this service. The fw4 include must not reload
   fw4 or unrelated services, avoiding recursion and lock-order deadlocks.
 - Do not reboot the live router or restart Passwall/adblock-fast for testing.
@@ -99,3 +110,9 @@ References:
 - Read VERIFICATION.md for the exact evidence and remaining verification limits.
 - Cleanup requirement: retain source, final APKs and verification documents;
   remove SDKs, VM disks, task-only build dependencies and remote staging after work.
+- Version 1.1.0-r1 introduces a native C/libjson-c RA helper and architecture-specific
+  main APK. Record packet, lifecycle, production and real iOS checks separately;
+  Linux tests and a successful deployment do not establish iOS acceptance.
+- Version 1.1.0-r1 isolated shared-AP packet tests and helper rollback, failure,
+  upgrade/reinstall, firewall lifecycle and reboot recovery passed. Procd tracks
+  the helper and wrapper files so package replacement starts the current program.

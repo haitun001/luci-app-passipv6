@@ -20,7 +20,7 @@ target=$(printf '%s' "$board" | jsonfilter -e '@.release.target')
 case "$release" in ''|*[!0-9.]*|.*|*.|*..*) fail 'A numbered stable ImmortalWrt release is required.' ;; esac
 comparison=$(apk version -t "$release" 25.12.1)
 case "$comparison" in '='|'>') ;; *) fail 'ImmortalWrt 25.12.1 or newer is required.' ;; esac
-apk info -e luci-base rpcd-mod-ucode ucode-mod-fs ucode-mod-uci ucode-mod-ubus ip-full >/dev/null ||
+apk info -e luci-base rpcd-mod-ucode ucode-mod-fs ucode-mod-uci ucode-mod-ubus ip-full libjson-c >/dev/null ||
 	fail 'Install the required LuCI/ucode and ip-full runtime packages first.'
 ip -j link show >/dev/null || fail 'JSON-capable ip-full is required.'
 
@@ -51,7 +51,7 @@ done
 
 mkdir "$work/stage"
 apk extract --allow-untrusted --destination "$work/stage" "$work/$app"
-ucode -L "$work/stage/usr/share/ucode" "$work/stage/usr/share/passipv6/run.uc" check ||
+ucode -L "$work/stage/usr/share/ucode" "$work/stage/usr/share/passipv6/run.uc" check "$work/stage/usr/libexec/passipv6-ra" ||
 	fail 'Compatibility check failed; the installed policy was not changed.'
 
 previous=$(uci -q export passipv6 2>/dev/null || true)
@@ -66,3 +66,4 @@ fi
 ucode -e 'import { status } from "passipv6"; let s = status(); if (!s.active || !s.applied) { warn(s.error ?? "IPv6 protection is not active", "\n"); exit(1); }' ||
 	fail 'The package is installed, but the active policy could not be verified.'
 printf 'PassIPV6 %s-r%s installed and active. Open Services > PassIPV6 in LuCI.\n' "$VERSION" "$REVISION"
+printf 'Reconnect affected devices once to refresh cached IPv6 routes and DNS settings.\n'

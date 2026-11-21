@@ -141,6 +141,15 @@ async function main() {
   assert(!cancelled.page.operation);
   assert(cancelled.page.error.textContent.includes('cancelled'));
 
+  const ra = await fixture({ status: { active: true, applied: true, ra_ready: false, mac: [MAC] } });
+  assert.equal(ra.page.message.textContent, 'IPv6 network settings could not be applied.');
+  await ra.page.handleSaveApply(null, '0');
+  assert(ra.page.operation, 'Do not confirm apply while RA delivery is unavailable');
+  ra.state.status = { active: true, applied: true, ra_ready: true, mac: [MAC] };
+  await ra.page.refresh();
+  assert(!ra.page.operation);
+  assert(ra.w.document.querySelector('.passipv6').textContent.includes('reconnect affected devices once'));
+
   const failure = await fixture();
   failure.state.apply = () => ({ success: false, message: 'nft check failed', status: failure.state.status });
   await failure.page.handleSaveApply(null, '0');

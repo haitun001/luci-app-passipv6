@@ -1,5 +1,31 @@
 # Verification
 
+## 1.1.0
+
+- Native C parser/configuration tests run with address and undefined-behavior
+  sanitizers. UI regression checks include refusing application confirmation while
+  RA delivery is unavailable and explaining the one-time client reconnect.
+- The implementation keeps the original subnet/AP layout and odhcpd configuration.
+  It blocks original multicast RAs and sends allowlisted copies through the same
+  bridge so that destination filtering also applies to stale helper snapshots.
+- Native packet tests passed on an isolated ImmortalWrt 25.12.1 / Linux 6.12.94 VM
+  with two clients behind one pure-AP bridge and one shared router uplink. Only
+  the allowed client received RA, PIO and RDNSS options and learned an RA default
+  route. Renewals remained live across two router lifetimes. A stale helper
+  snapshot could not deliver RAs to a removed MAC; reconnecting a denied client
+  left it without an advertised default route or RDNSS option.
+- The same run passed IPv4/IPv6 connectivity, actual DHCPv6 lease allocation,
+  revocation of TCP/UDP with a real OFFLOAD conntrack flag, atomic transaction
+  failure, repeated applies and unrelated table preservation.
+- Native upgrade from 1.0.2 and same-version reinstall preserved the populated
+  allowlist. Invalid configuration, concurrent reloads, firewall reload/restart,
+  helper commit failure with rollback, altered guard detection, helper failure
+  and procd recovery passed. Program file changes replaced the helper while
+  preserving the policy. Reboot recovered active filtering and RA delivery.
+- Real iOS reconnection, DNS selection, sleep/wake and application behavior remain
+  unverified. Linux tests and successful installation do not establish iOS
+  acceptance. Production deployment evidence is recorded separately after rollout.
+
 ## 1.0.2
 
 - Native uclient-fetch timed out connecting directly to GitHub on the reference
@@ -47,7 +73,7 @@
 
 ## Packet-filtering baseline
 
-The filtering rules are unchanged from development version 1.0.0-r2. Its isolated
+Versions through 1.0.2 retained the filtering rules from 1.0.0-r2. Its isolated
 ImmortalWrt 25.12.1 / Linux 6.12.94 VM tests covered:
 
 - IPv4 and IPv6 connectivity for allowed clients; IPv6 blocking for denied clients.

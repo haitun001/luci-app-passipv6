@@ -73,7 +73,9 @@ apk() {
  esac
 }
 ucode() {
- if [ "$1" = -L ]; then printf 'check\\n' >> "$CASE_ROOT/order"; [ "$CASE" != capability ];
+ if [ "$1" = -L ]; then
+  [ "$4" = check ] && [ "$5" = "\${2%/usr/share/ucode}/usr/libexec/passipv6-ra" ] || return 1
+  printf 'check\\n' >> "$CASE_ROOT/order"; [ "$CASE" != capability ];
  else printf 'status\\n' >> "$CASE_ROOT/order"; [ "$CASE" != inactive ]; fi
 }
 `;
