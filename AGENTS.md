@@ -94,7 +94,7 @@ References:
   installer preflight and public CI releases. Preserve live allowlists on updates.
 - Version 1.0.2-r1 prefers curl when available, with bounded download timeouts;
   verify both downloader paths and the published bootstrap command.
-- Version 1.0.2-r1 is installed on the reference router. The published installer
+- Version 1.0.2-r1 was previously installed on the reference router. Its published installer
   passed a native upgrade and same-version reinstall with the live allowlist
   preserved. English/Chinese no-change apply announcements, Material-theme axe
   checks, 320px layout, unrelated rules/configuration and service PIDs were verified.
@@ -116,3 +116,7 @@ References:
 - Version 1.1.0-r1 isolated shared-AP packet tests and helper rollback, failure,
   upgrade/reinstall, firewall lifecycle and reboot recovery passed. Procd tracks
   the helper and wrapper files so package replacement starts the current program.
+- Version 1.1.0-r1 is installed on the reference router using the published bootstrap.
+  Configuration, allowlist, unrelated rule structure and tracked service PIDs were
+  preserved; IPv4 HTTPS/DNS and live RA capture/copy/guard counters passed.
+  Physical iOS acceptance remains separate and must not be inferred from these checks.

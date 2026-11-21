@@ -30,9 +30,20 @@
   retained the active policy; changed-selection Save & Apply confirmed the new
   allowlist after native reload. No-change apply immediately announced progress
   and then the active policy, without an intervening unsaved/save-only message.
+- The published 1.1.0 bootstrap upgraded the reference router successfully.
+  The populated allowlist, network/DHCP/firewall/proxy/ad-filter configuration
+  hashes, unrelated nftables structure (excluding dynamic set members/counters)
+  and all six tracked service PIDs were unchanged. IPv4 HTTPS and local DNS passed.
+  Backend filtering, helper readiness and application confirmation were all true.
+- Production counters recorded locally generated RAs being captured, allowlisted
+  copies being sent, and original multicast RAs being dropped. These observations
+  confirm router-side behavior; they do not prove a physical iOS client's state.
+- The public Release contains both APKs, the version-pinned installer and checksums.
+  Downloaded assets matched SHA256SUMS, and the public latest bootstrap matched
+  the 1.1.0 installer. Both main and tag workflows passed.
 - Real iOS reconnection, DNS selection, sleep/wake and application behavior remain
   unverified. Linux tests and successful installation do not establish iOS
-  acceptance. Production deployment evidence is recorded separately after rollout.
+  acceptance.
 
 ## 1.0.2
 
