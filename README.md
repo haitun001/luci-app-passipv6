@@ -8,7 +8,7 @@
 
 **1.1.0：保持原网段和纯 AP 布局，按白名单递送 IPv6 路由通告。**
 升级或修改权限后，请将受影响设备断开并重新连接一次，以刷新旧路由和 DNS。
-真实 iOS 的使用体验需要单独验收，不能将 Linux 测试等同于 iOS 已修复。
+参考用户已确认 iPhone 重连后恢复正常；更多机型、系统版本和休眠唤醒场景仍需验证。
 
 ## 功能
 
@@ -144,8 +144,9 @@ original multicast copies, preserving the existing subnet, AP layout and odhcpd 
 The native helper is supervised by procd; application is confirmed only when filtering and RA
 delivery agree. A helper failure keeps the multicast guard in place and is reported as an error.
 RA relay/hybrid modes are unsupported. Reconnect affected devices once after upgrading or
-changing permissions to refresh cached IPv6 routes and DNS. Real iOS acceptance is separate
-from Linux packet tests and must not be assumed from a successful installation.
+changing permissions to refresh cached IPv6 routes and DNS. The reference user confirmed
+normal iPhone connectivity after reconnecting. Other models, iOS versions and sleep/wake
+behavior still require separate verification.
 
 Old SLAAC and self-generated link-local addresses may remain. Other necessary multicast remains
 available; downstream traffic that never reaches the router and MAC spoofing are outside this

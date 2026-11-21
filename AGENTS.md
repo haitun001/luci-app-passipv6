@@ -119,4 +119,5 @@ References:
 - Version 1.1.0-r1 is installed on the reference router using the published bootstrap.
   Configuration, allowlist, unrelated rule structure and tracked service PIDs were
   preserved; IPv4 HTTPS/DNS and live RA capture/copy/guard counters passed.
-  Physical iOS acceptance remains separate and must not be inferred from these checks.
+  The reference user confirmed normal iPhone connectivity after one Wi-Fi reconnect.
+  Other iOS versions, physical clients and sleep/wake behavior require separate checks.

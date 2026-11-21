@@ -41,9 +41,11 @@
 - The public Release contains both APKs, the version-pinned installer and checksums.
   Downloaded assets matched SHA256SUMS, and the public latest bootstrap matched
   the 1.1.0 installer. Both main and tag workflows passed.
-- Real iOS reconnection, DNS selection, sleep/wake and application behavior remain
-  unverified. Linux tests and successful installation do not establish iOS
-  acceptance.
+- After deployment, the reference user reported that the affected, unselected
+  iPhone returned to normal connectivity after one Wi-Fi reconnection. This
+  evidence covers that user's reconnection/application check. The exact iOS
+  version, resolver state, sleep/wake behavior and other physical clients were
+  not independently recorded or tested.
 
 ## 1.0.2
 

@@ -5,12 +5,14 @@
 - 阻止原始组播路由通告，使用原生辅助进程按白名单 MAC 递送本机通告，保持现有网段、纯 AP 和 odhcpd 配置。
 - 保留加速前入口与桥出口过滤；应用同时确认规则和通告递送进程，失败恢复上一策略，进程故障保持封锁并报告错误。
 - 首次升级或修改权限后，受影响设备需断开并重连一次，以刷新旧 IPv6 路由和 DNS 状态。链路本地地址仍可能存在。
-- 主 APK 包含原生程序，改为目标架构包；更新安装预检、生命周期测试及构建流程。真实 iOS 的回退体验须单独验收，不将语法检查或 Linux 测试等同于 iOS 验证。
+- 主 APK 包含原生程序，改为目标架构包；更新安装预检、生命周期测试及构建流程。
+- 公开安装命令已完成实际路由器升级，保留原配置和白名单。参考用户确认 iPhone 重连后恢复正常；更多机型、iOS 版本和休眠唤醒场景尚未覆盖。
 
 - Deliver native router advertisements to allowlisted Ethernet addresses while blocking their original multicast copies, without changing subnets, AP layout or odhcpd configuration.
 - Confirm both packet filtering and RA delivery on apply, roll back failed applications, and keep filtering enforced when the helper fails.
 - Reconnect affected clients once after upgrading or changing permissions to refresh cached IPv6 routes and DNS. Link-local addresses may remain.
-- Build a native architecture-specific main APK and update installer preflight and lifecycle coverage. Real iOS behavior requires separate acceptance testing.
+- Build a native architecture-specific main APK and update installer preflight and lifecycle coverage.
+- The published bootstrap upgraded the reference router while preserving its configuration and allowlist. The reference user confirmed normal iPhone connectivity after reconnecting; other models, iOS versions and sleep/wake scenarios remain unverified.
 
 ## 1.0.2
 
