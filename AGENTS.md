@@ -135,3 +135,7 @@ References:
   unrelated services. HomePod failures also persisted with both plugin tables
   removed and its helper stopped. Physical playback acceptance is still pending
   and must not be claimed from transport tests or a successful deployment alone.
+- Version 1.2.0 is published with both APKs, a versioned installer and verified
+  checksums. The public latest bootstrap passed a production same-version
+  reinstall after the direct upgrade, preserving configuration, the allowlist
+  and tracked service PIDs while confirming active filtering and RA readiness.

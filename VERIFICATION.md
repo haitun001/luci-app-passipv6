@@ -48,6 +48,11 @@
   Native status and RPC both confirmed active filtering, applied configuration
   and RA readiness; service autostart was enabled. Uploaded APK checksums matched
   the successful CI build, and the deployment staging directory was removed.
+- The main and 1.2.0 tag workflows passed, and the immutable public Release
+  contains both APKs, install.sh and SHA256SUMS. All downloaded assets matched
+  their checksums. The public latest bootstrap then reinstalled 1.2.0-r1 on the
+  production router with configuration, allowlist and tracked service PIDs
+  unchanged; active/applied/RA-ready status and autostart were confirmed again.
 
 ## 1.1.0
 
