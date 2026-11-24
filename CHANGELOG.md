@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0
+
+- 将 IPv6 白名单明确为路由访问权限，保留同一 LAN 设备之间的 IPv6 通信、组播发现和单播回复。
+- 在 LAN 桥主设备入口及桥输出路径限制未授权路由流量，继续保护 RA、DHCPv6 和已有软件加速连接的撤权。
+- 应用状态核对关键规则内容、hook、接口和端口集合；保持已有白名单、原子应用和辅助进程回退。
+- 增加跨 LAN 桥端口的发现传输、邻居发现、地址冲突检测和组播加入回归测试；实际应用兼容性以验证记录为准。
+
+- Preserve IPv6 communication and discovery between devices on the same LAN while restricting routed IPv6 access by MAC.
+- Filter before software flow offload on the bridge master and block routed replies at bridge output; retain RA and DHCPv6 protection.
+- Validate actual filtering expressions, hooks and interfaces before reporting an active policy. Existing configuration and rollback remain supported.
+- Add packet regressions across separate LAN bridge ports. See the verification record for the tested application and hardware limits.
+
 ## 1.1.0
 
 - 阻止原始组播路由通告，使用原生辅助进程按白名单 MAC 递送本机通告，保持现有网段、纯 AP 和 odhcpd 配置。

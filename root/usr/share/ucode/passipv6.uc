@@ -109,9 +109,10 @@ function renderRules(config, ctx) {
 	let ports = map(ctx.ports, safeInterface);
 	let devices = map(ctx.devices, safeInterface);
 	let allow = `set allowed_macs { type ether_addr; ${elements(config.mac, false)} }`;
-	let ingress = length(devices) ? `
+	// Switched LAN frames never enter the bridge master's IP receive path.
+	let ingress = index(devices, bridge) >= 0 ? `
     chain lan_ingress {
-        type filter hook ingress devices = { ${join(', ', map(devices, d => sprintf('"%s"', d)))} } priority -500; policy accept;
+        type filter hook ingress device "${bridge}" priority -500; policy accept;
         meta nfproto ipv6 ether saddr != @allowed_macs counter drop
     }` : '';
 	return `destroy table inet passipv6
@@ -119,22 +120,22 @@ destroy table bridge passipv6
 table inet passipv6 {
     ${allow}
     ${ingress}
-    chain lan_prerouting {
-        type filter hook prerouting priority -310; policy accept;
-        iifname "${bridge}" meta nfproto ipv6 ether saddr != @allowed_macs counter drop
-    }
 }
 table bridge passipv6 {
     ${allow}
     set lan_ports { type ifname; ${elements(ports, true)} }
     chain lan_prerouting {
         type filter hook prerouting priority -310; policy accept;
-        iifname @lan_ports ether type ip6 ether saddr != @allowed_macs counter drop
+        iifname @lan_ports ether type ip6 meta l4proto udp udp dport 547 ether saddr != @allowed_macs counter drop
+    }
+    chain lan_output {
+        type filter hook output priority 310; policy accept;
+        oifname @lan_ports ether type ip6 ether daddr & 01:00:00:00:00:00 == 00:00:00:00:00:00 ether daddr != @allowed_macs counter drop
     }
     chain lan_postrouting {
         type filter hook postrouting priority 310; policy accept;
-        oifname @lan_ports ether type ip6 meta l4proto ipv6-icmp icmpv6 type nd-router-advert ether daddr & 01:00:00:00:00:00 != 00:00:00:00:00:00 counter drop comment "passipv6-ra-guard"
-        oifname @lan_ports ether type ip6 ether daddr & 01:00:00:00:00:00 == 00:00:00:00:00:00 ether daddr != @allowed_macs counter drop
+        oifname @lan_ports ether type ip6 meta l4proto ipv6-icmp icmpv6 type nd-router-advert ether daddr != @allowed_macs counter drop comment "passipv6-ra-guard"
+        oifname @lan_ports ether type ip6 meta l4proto udp udp dport 546 ether daddr != @allowed_macs counter drop
     }
 }
 `;
@@ -209,20 +210,69 @@ function raStatus() {
 	catch (e) { return { ready: false, error: e.message }; }
 }
 
-function raGuard(table) {
-	for (let entry in table?.nftables ?? []) {
-		let rule = entry.rule;
-		if (rule?.chain != 'lan_postrouting' || rule.comment != 'passipv6-ra-guard') continue;
-		let expr = filter(rule.expr ?? [], item => item.counter == null);
-		// nft JSON omits the protocol dependencies already implied by icmpv6 type.
-		return same(expr, [
-			{ match: { op: '==', left: { meta: { key: 'oifname' } }, right: '@lan_ports' } },
-			{ match: { op: '==', left: { payload: { protocol: 'icmpv6', field: 'type' } }, right: 'nd-router-advert' } },
-			{ match: { op: '!=', left: { '&': [{ payload: { protocol: 'ether', field: 'daddr' } }, '01:00:00:00:00:00'] }, right: '00:00:00:00:00:00' } },
-			{ drop: null }
-		]);
+function policyMatches(inet, bridge, ctx) {
+	function matchExpr(left, right, op) { return { match: { op: op ?? '==', left, right } }; }
+	function payload(protocol, field) { return { payload: { protocol, field } }; }
+	let incoming = matchExpr({ meta: { key: 'iifname' } }, '@lan_ports');
+	let outgoing = matchExpr({ meta: { key: 'oifname' } }, '@lan_ports');
+	let ipv6 = matchExpr(payload('ether', 'type'), 'ip6');
+	let deniedSource = matchExpr(payload('ether', 'saddr'), '@allowed_macs', '!=');
+	let deniedTarget = matchExpr(payload('ether', 'daddr'), '@allowed_macs', '!=');
+	// nft JSON omits protocol dependencies implied by the transport expression.
+	let expected = {
+		inet: {
+			lan_ingress: { hook: 'ingress', prio: -500, rules: [[
+				matchExpr({ meta: { key: 'nfproto' } }, 'ipv6'), deniedSource, { drop: null }
+			]] }
+		},
+		bridge: {
+			lan_prerouting: { hook: 'prerouting', prio: -310, rules: [[
+				incoming, ipv6, matchExpr(payload('udp', 'dport'), 547), deniedSource, { drop: null }
+			]] },
+			lan_output: { hook: 'output', prio: 310, rules: [[
+				outgoing, ipv6,
+				matchExpr({ '&': [payload('ether', 'daddr'), '01:00:00:00:00:00'] }, '00:00:00:00:00:00'),
+				deniedTarget, { drop: null }
+			]] },
+			lan_postrouting: { hook: 'postrouting', prio: 310, rules: [
+				[outgoing, matchExpr(payload('icmpv6', 'type'), 'nd-router-advert'), deniedTarget, { drop: null }],
+				[outgoing, ipv6, matchExpr(payload('udp', 'dport'), 546), deniedTarget, { drop: null }]
+			] }
+		}
+	};
+	for (let family, table in { inet, bridge }) {
+		let entries = table?.nftables ?? [];
+		let chains = filter(entries, entry => entry.chain != null);
+		let rules = filter(entries, entry => entry.rule != null);
+		if (length(chains) != length(keys(expected[family]))) return false;
+		let count = 0;
+		for (let entry in chains) {
+			let chain = entry.chain, wanted = expected[family][chain.name];
+			if (!wanted || chain.type != 'filter' || chain.policy != 'accept' ||
+			    chain.hook != wanted.hook || chain.prio != wanted.prio) return false;
+			if (family == 'inet') {
+				let devices = chain.dev ?? [];
+				if (type(devices) == 'string') devices = [devices];
+				if (!same(devices, [ctx.bridge])) return false;
+			}
+			let actual = map(filter(rules, entry => entry.rule.chain == chain.name),
+				entry => filter(entry.rule.expr ?? [], expr => expr.counter == null));
+			if (!same(actual, wanted.rules)) return false;
+			count += length(wanted.rules);
+		}
+		if (length(rules) != count) return false;
+		let sets = filter(entries, entry => entry.set != null);
+		if (length(sets) != (family == 'inet' ? 1 : 2)) return false;
+		for (let entry in sets) {
+			let set = entry.set;
+			if (set.name == 'allowed_macs') {
+				if (set.type != 'ether_addr') return false;
+			} else if (family == 'bridge' && set.name == 'lan_ports') {
+				if (set.type != 'ifname' || !same(sort(set.elem ?? []), sort([...ctx.ports]))) return false;
+			} else return false;
+		}
 	}
-	return false;
+	return true;
 }
 
 function reload() {
@@ -314,11 +364,8 @@ function status() {
 	let config, ctx, error = state.error;
 	try { config = readConfig(); ctx = context(config); }
 	catch (e) { error = e.message; }
-	let chainCount = table => length(filter(table?.nftables ?? [], entry => entry.chain != null));
-	let ruleCount = table => length(filter(table?.nftables ?? [], entry => entry.rule != null));
 	let live = ctx && index(ctx.devices, ctx.bridge) >= 0;
-	let active = live && chainCount(inet) == 2 && ruleCount(inet) == 2 &&
-		chainCount(bridge) == 2 && ruleCount(bridge) == 3 && raGuard(bridge) &&
+	let active = live && policyMatches(inet, bridge, ctx) &&
 		imac != null && same(imac, bmac) && same(imac, last?.mac);
 	let ra = raStatus(), snapshot = readJSON(raActive);
 	let raReady = !!(ra.ready && snapshot && same(ra.config, snapshot) &&

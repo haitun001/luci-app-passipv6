@@ -8,7 +8,10 @@ public repository, artifacts, logs, or documentation.
 
 The policy retains SLAAC for allowed clients: native router advertisements are
 delivered to allowlisted Ethernet addresses, and original multicast RAs are blocked.
-Unlisted clients cannot use IPv6 through this router or obtain DHCPv6 leases.
+Unlisted clients cannot route IPv6 through this router or obtain DHCPv6 leases.
+Version 1.2.0 explicitly permits IPv6 between peers on the same LAN, including
+traffic switched across this router's bridge ports. Router-local IPv6 services
+retain their previous restrictions. This supersedes the older blanket LAN filter.
 Previously learned SLAAC and self-generated link-local addresses may remain.
 Reconnect affected clients once after upgrade or permission changes to refresh
 cached routes and DNS; real iOS behavior requires explicit acceptance testing.
@@ -39,8 +42,10 @@ Initial policy is enabled with an empty allowlist. IPv4 remains available.
   change other tables, NAT, marks, DNS, DHCP or offload settings.
 - Filter IPv6 only. Whitelisted traffic continues through existing firewall and
   service rules. Preserve essential IPv6 multicast for compatible SLAAC clients.
-- LAN ingress filtering must precede flow offload; bridge egress filtering blocks
-  replies to removed MACs. Do not replace this with a normal forward-chain rule.
+- LAN bridge-master ingress filtering must precede flow offload; bridge output
+  filtering blocks routed replies to removed MACs. Do not filter ordinary LAN
+  switching or replace the routing guard with a normal IP forward-chain rule.
+  Bridge postrouting still guards multicast/unicast RA and DHCPv6 replies.
 - Validate the actual offload path. Hardware offload or directly offloaded bridge
   ports require an explicit unsupported-state error, not a silent security downgrade.
 - Apply both tables in one nft transaction after `nft --check`. Serialize writers.

@@ -1,5 +1,31 @@
 # Verification
 
+## 1.2.0
+
+- The policy now permits IPv6 between LAN peers while denying unauthorized
+  routed access. Native packet tests on isolated ImmortalWrt 25.12.1 / Linux
+  6.12.94 passed with clients behind a shared AP and on separate router LAN ports.
+- The isolated run passed IPv4, link-local/ULA/global IPv6 between LAN peers,
+  fresh neighbor resolution and DAD, and bidirectional TCP. The discovery
+  transport matrix exercised IPv4/IPv6 mDNS, SSDP, LLMNR and PTP multicast
+  addresses/ports with both unicast and multicast replies and snooping on/off.
+  These are transport tests, not implementations of all those application protocols.
+- Actual software-OFFLOAD TCP/UDP flows stopped in both directions on revocation.
+  Unauthorized routed IPv6 and DHCPv6 allocation remained blocked; authorized
+  IPv6, DHCPv6 and RA/PIO/RDNSS renewal passed. Empty allowlists, stale helper
+  snapshots, failed transactions and unrelated table preservation also passed.
+- UI regression/axe checks, installer fixtures, metadata/translation checks and
+  sanitized native RA parser tests passed. Windows ran the UI tests; Bash
+  installer tests ran under Linux because their paths are POSIX paths.
+- During the initial production investigation, legacy-unicast IPv4 mDNS queries
+  received AirPlay service records while ordinary multicast queries received no
+  responses. AnyAirPlay's saved target can remain visible with "waiting for device"
+  even when discovery has not resolved it. This does not establish that PassIPV6
+  caused the complete reported application failure.
+- Package upgrade/reinstall, production deployment and physical HomePod playback
+  acceptance for this version are pending. Do not infer those results from packet
+  tests or from the older releases below.
+
 ## 1.1.0
 
 - Native C parser/configuration tests run with address and undefined-behavior

@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 LUCI_NAME:=luci-app-passipv6
 LUCI_TITLE:=IPv6 MAC allowlist
 LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode-mod-fs +ucode-mod-uci +ucode-mod-ubus +firewall4 +ip-full +libjson-c
-PKG_VERSION:=1.1.0
+PKG_VERSION:=1.2.0
 PKG_RELEASE:=1
 PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 PKG_LICENSE:=Apache-2.0

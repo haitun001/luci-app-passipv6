@@ -4,9 +4,11 @@
 [Releases](https://github.com/haitun001/luci-app-passipv6/releases) · [Apache-2.0](LICENSE)
 
 原生 LuCI IPv6 MAC 白名单插件，入口为 **服务 → PassIPV6**。
-勾选允许使用 IPv6 的设备，然后保存并应用。IPv4 继续可用。
+勾选允许通过 IPv6 访问其他网络的设备，然后保存并应用。IPv4 和同一 LAN 设备之间的通信继续可用。
 
-**1.1.0：保持原网段和纯 AP 布局，按白名单递送 IPv6 路由通告。**
+**1.2.0：保留局域网 IPv6 通信与设备发现，继续按白名单限制 IPv6 路由访问。**
+这明确改变了旧版对跨 LAN 桥端口 IPv6 通信的全面封锁：未勾选设备也可在同一 LAN 内通信。
+RA 和 DHCPv6 配置分发仍受限制，未勾选设备不能经路由器访问其他 IPv6 网络。
 升级或修改权限后，请将受影响设备断开并重新连接一次，以刷新旧路由和 DNS。
 参考用户已确认 iPhone 重连后恢复正常；更多机型、系统版本和休眠唤醒场景仍需验证。
 
@@ -70,8 +72,10 @@ apk del luci-i18n-passipv6-zh-cn luci-app-passipv6
 
 ## 工作方式与边界
 
-入口过滤在软件 flowtable 之前按源 MAC 拦截，桥出口按目标 MAC 拦截未经授权的
-IPv6 单播；已取得地址和已有加速连接也受限制。原始组播 RA 在桥出口被拦截。
+入口过滤在 LAN 桥主设备的软件 flowtable 之前按源 MAC 拦截，桥输出路径按目标 MAC
+拦截发往未经授权设备的 IPv6 单播；已取得地址和已有加速连接也受限制。普通 LAN
+桥转发不会进入这两个路由过滤路径，设备之间的 IPv6 单播、组播及邻居发现继续可用。
+桥出口单独拦截原始组播 RA 和发往未授权 MAC 的单播 RA，并限制 DHCPv6 请求与回复。
 原生辅助进程保留 odhcpd 生成的通告内容，按白名单改为二层单播递送，符合
 [RFC 6085](https://www.rfc-editor.org/rfc/rfc6085)。副本通过原桥发送，仍受出口过滤约束。
 两个表在一次 nft 事务中更新，辅助进程确认当前策略后才报告应用成功。
@@ -81,10 +85,13 @@ IPv6 单播；已取得地址和已有加速连接也受限制。原始组播 RA
 辅助进程异常时保留通告拦截、报告失败并由 procd 恢复；故障期间允许设备的
 IPv6 配置可能无法续期，不会通过重新放开组播掩盖故障。
 
-未授权设备可能仍显示旧 SLAAC 或自行生成的 `fe80::` 地址，但不能据此经本路由器进行
-IPv6 单播通信或获得 DHCPv6 租约。升级或取消授权后需重连一次，以刷新客户端缓存；
+未授权设备可能仍显示旧 SLAAC 或自行生成的 `fe80::` 地址，可用于同一 LAN 内的通信，
+但不能据此经本路由器访问其他 IPv6 网络或获得 DHCPv6 租约。路由器本机 IPv6 服务仍
+维持原有限制。升级或取消授权后需重连一次，以刷新客户端缓存；
 未刷新缓存时仍可能出现 IPv6 超时和 IPv4 回退等待。下游 AP／交换机内部不经过路由器
-的通信和其他设备私自发出的通告无法由此插件完全控制。MAC 白名单不等同于设备身份认证。
+的通信和其他设备私自发出的通告无法由此插件完全控制。MAC 白名单不等同于设备身份认证，
+也不能阻止同一 LAN 内的其他主机充当代理。设备发现还依赖 AP 和客户端允许组播；不能将
+路由器的规则语法检查等同于所有投屏、音频或智能家居应用均已兼容。
 
 配置保存在 `/etc/config/passipv6`，最近成功配置为
 `/etc/passipv6/last-good.json`。设备轮询不写闪存，配置未变时重载也不重复写恢复备份。
@@ -119,7 +126,7 @@ PASSIPV6_SDK=/path/to/immortalwrt-sdk sh tools/build.sh
 ```
 
 CI 对 main 和 PR 执行测试及构建；推送与 `PKG_VERSION` 一致的版本标签，例如
-`1.1.0`，才发布 Release。正式 Release 不覆盖原有版本，修正后递增版本。
+`1.2.0`，才发布 Release。正式 Release 不覆盖原有版本，修正后递增版本。
 构建基线为官方 ImmortalWrt 25.12.1 SDK；依赖仅为原生运行时。
 产物为主 APK、中文 APK、版本固定的安装脚本和 SHA256SUMS。
 
@@ -130,7 +137,8 @@ CI 对 main 和 PR 执行测试及构建；推送与 `PKG_VERSION` 一致的版�
 ## English
 
 PassIPV6 is a native LuCI IPv6 MAC allowlist under **Services → PassIPV6**.
-Only selected LAN devices may use IPv6 through the router; IPv4 remains available.
+Only selected LAN devices may reach other networks using IPv6 through the router.
+IPv4 and IPv6 communication between devices on the same LAN remain available.
 The page supports English and Simplified Chinese, keyboard access and screen-reader announcements.
 
 The installer above installs, upgrades or reinstalls the latest stable release while preserving
@@ -139,7 +147,10 @@ empty allowlist. It requires x86/64 ImmortalWrt 25.12.1 or newer stable releases
 ucode, ip-full and libjson-c runtime, and compatible nftables bridge/ingress filtering. Runtime checks
 are mandatory; hardware offload and direct bridge-port flowtable offload are unsupported.
 
-Version 1.1.0 delivers locally generated RAs to allowlisted Ethernet addresses and blocks their
+Version 1.2.0 separates LAN switching from routed IPv6 access, including link-local, ULA and
+global addresses used between LAN peers. This intentionally replaces the earlier blanket
+blocking of IPv6 across LAN bridge ports. Router-local IPv6 services retain their previous
+restrictions. The policy still delivers locally generated RAs to allowlisted Ethernet addresses and blocks their
 original multicast copies, preserving the existing subnet, AP layout and odhcpd configuration.
 The native helper is supervised by procd; application is confirmed only when filtering and RA
 delivery agree. A helper failure keeps the multicast guard in place and is reported as an error.
@@ -148,7 +159,8 @@ changing permissions to refresh cached IPv6 routes and DNS. The reference user c
 normal iPhone connectivity after reconnecting. Other models, iOS versions and sleep/wake
 behavior still require separate verification.
 
-Old SLAAC and self-generated link-local addresses may remain. Other necessary multicast remains
+Old SLAAC and self-generated link-local addresses may remain and support local communication.
+Other necessary multicast remains
 available; downstream traffic that never reaches the router and MAC spoofing are outside this
 control. Future firmware versions must retain the required APIs and pass preflight checks.
 See Releases for the two packages, installer and checksums.

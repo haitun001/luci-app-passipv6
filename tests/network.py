@@ -7,10 +7,10 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NAMES = ['p6r', 'p6ap', 'p6a', 'p6b', 'p6w']
+NAMES = ['p6r', 'p6ap', 'p6a', 'p6b', 'p6c', 'p6w']
 WHITE = '02:00:00:00:00:0a'
 BLACK = '02:00:00:00:00:0b'
-CONTEXT = {'bridge': 'br-lan', 'ports': ['la'], 'devices': ['br-lan', 'la']}
+CONTEXT = {'bridge': 'br-lan', 'ports': ['la', 'lc'], 'devices': ['br-lan', 'la', 'lc']}
 HELPER = '/usr/libexec/passipv6-ra'
 GENERATION = 0
 
@@ -212,6 +212,110 @@ while time.monotonic()<end:
     print('PASS: existing offloaded TCP stops after revocation; allowed IPv6 and denied-client IPv4 survive', flush=True)
 
 
+def lan_communication():
+    policy([WHITE])
+    addresses = {}
+    for ns, suffix in [('p6b', '11'), ('p6c', '12')]:
+        run(['ip', '-6', 'addr', 'add', f'2001:db8:42::{suffix}/64', 'dev', 'eth0'], ns)
+        addresses[ns] = next(a['local'] for link in json.loads(
+            run(['ip', '-6', '-j', 'addr', 'show', 'dev', 'eth0'], ns).stdout)
+            for a in link['addr_info'] if a['scope'] == 'link')
+    time.sleep(2)
+    for ns in ['p6b', 'p6c']:
+        assert not any(a.get('tentative') or a.get('dadfailed') for link in json.loads(
+            run(['ip', '-6', '-j', 'addr', 'show', 'dev', 'eth0'], ns).stdout)
+            for a in link['addr_info']), 'DAD must work after IPv6 routing is denied'
+        run(['ip', '-6', 'neigh', 'flush', 'dev', 'eth0'], ns)
+    for address in ['192.0.2.11', 'fd42::11', '2001:db8:42::11', addresses['p6b'] + '%eth0']:
+        ping('p6c', address)
+    ping('p6b', 'fd42::12')
+    ping('p6b', 'fd43::2', False)
+    ping('p6c', 'fd43::2', False)
+
+    peer = '''import socket,struct,sys,time
+role,family,group,port,multicast=sys.argv[1:]; family=int(family); port=int(port)
+af=socket.AF_INET if family==4 else socket.AF_INET6
+s=socket.socket(af,socket.SOCK_DGRAM);s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+s.settimeout(4);s.bind(('0.0.0.0' if family==4 else '::',port))
+idx=socket.if_nametoindex('eth0')
+if family==4:
+ local='192.0.2.12' if role=='server' else '192.0.2.11'
+ s.setsockopt(socket.IPPROTO_IP,socket.IP_ADD_MEMBERSHIP,socket.inet_aton(group)+socket.inet_aton(local))
+ s.setsockopt(socket.IPPROTO_IP,socket.IP_MULTICAST_IF,socket.inet_aton(local))
+ s.setsockopt(socket.IPPROTO_IP,socket.IP_MULTICAST_TTL,255)
+ destination=(group,port)
+else:
+ s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_JOIN_GROUP,socket.inet_pton(af,group)+struct.pack('@I',idx))
+ s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_MULTICAST_IF,idx)
+ s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_MULTICAST_HOPS,255)
+ destination=(group,port,0,idx)
+query=b'passipv6-discovery-query'; reply=b'passipv6-discovery-reply'
+print('READY',flush=True)
+if role=='client':
+ time.sleep(.5)
+ s.sendto(query,destination)
+deadline=time.monotonic()+4
+while time.monotonic()<deadline:
+ data,source=s.recvfrom(4096)
+ if role=='server' and data==query:
+  s.sendto(reply,destination if multicast=='1' else source);time.sleep(.2);break
+ if role=='client' and data==reply:break
+else:raise AssertionError('No discovery exchange')
+'''
+    groups = [(5353, '224.0.0.251', 'ff02::fb'), (1900, '239.255.255.250', 'ff02::c'),
+              (5355, '224.0.0.252', 'ff02::1:3'), (319, '224.0.1.129', 'ff02::181'),
+              (320, '224.0.1.129', 'ff02::181')]
+    for snooping in ['0', '1']:
+        run(['ip', 'link', 'set', 'br-lan', 'type', 'bridge', 'mcast_snooping', snooping,
+             'mcast_querier', snooping], 'p6r')
+        run(['ip', 'link', 'set', 'br-ap', 'type', 'bridge', 'mcast_snooping', snooping,
+             'mcast_querier', snooping], 'p6ap')
+        for port, group4, group6 in groups:
+            for family, group in [(4, group4), (6, group6)]:
+                for multicast in ['0', '1']:
+                    args = [str(family), group, str(port), multicast]
+                    server = subprocess.Popen(['ip', 'netns', 'exec', 'p6c', 'python3', '-c', peer,
+                                               'server', *args], text=True, stdout=subprocess.PIPE)
+                    try:
+                        assert server.stdout.readline().strip() == 'READY'
+                        run(['python3', '-c', peer, 'client', *args], 'p6b')
+                        assert server.wait(timeout=5) == 0
+                    finally:
+                        if server.poll() is None:
+                            server.terminate()
+                        server.wait(timeout=5)
+        print(f'PASS: discovery transport matrix with multicast snooping={snooping}', flush=True)
+    stream = '''import socket,sys
+role,family=sys.argv[1:]; family=int(family)
+s=socket.socket(socket.AF_INET if family==4 else socket.AF_INET6,socket.SOCK_STREAM)
+s.settimeout(4)
+if role=='server':
+ s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+ s.bind(('192.0.2.12' if family==4 else 'fd42::12',45682));s.listen()
+ print('READY',flush=True);s,_=s.accept();s.settimeout(4)
+ assert s.recv(1024)==b'control';s.sendall(b'audio')
+else:
+ s.connect(('192.0.2.12' if family==4 else 'fd42::12',45682))
+ s.sendall(b'control');assert s.recv(1024)==b'audio'
+'''
+    for family in ['4', '6']:
+        server = subprocess.Popen(['ip', 'netns', 'exec', 'p6c', 'python3', '-c', stream,
+                                   'server', family], text=True, stdout=subprocess.PIPE)
+        try:
+            assert server.stdout.readline().strip() == 'READY'
+            run(['python3', '-c', stream, 'client', family], 'p6b')
+            assert server.wait(timeout=5) == 0
+        finally:
+            if server.poll() is None:
+                server.terminate()
+            server.wait(timeout=5)
+    # Replies must survive even when neither endpoint has routing permission.
+    policy([])
+    ping('p6c', 'fd42::11')
+    ping('p6c', 'fd43::2', False)
+    print('PASS: separate LAN bridge ports preserve IPv4/IPv6 discovery transports, unicast replies, TCP, fresh NDP/DAD and multicast joins with snooping on/off; routing stays denied', flush=True)
+
+
 def main():
     processes = []
     try:
@@ -231,14 +335,15 @@ def main():
         run(['ip', 'link', 'set', 'ap-up', 'up'], 'p6ap')
         connect('ap-a', 'p6a', '192.0.2.10/24', 'fd42::10/64', WHITE, 'p6ap')
         connect('ap-b', 'p6b', '192.0.2.11/24', 'fd42::11/64', BLACK, 'p6ap')
+        connect('lc', 'p6c', '192.0.2.12/24', 'fd42::12/64', '02:00:00:00:00:0c')
         connect('wan', 'p6w', '198.51.100.2/24', 'fd43::2/64')
         for port in ['ap-up', 'ap-a', 'ap-b']:
             run(['ip', 'link', 'set', port, 'master', 'br-ap'], 'p6ap')
-        for port in ['la']:
+        for port in ['la', 'lc']:
             run(['ip', 'link', 'set', port, 'master', 'br-lan'], 'p6r')
         run(['ip', 'addr', 'add', '198.51.100.1/24', 'dev', 'wan'], 'p6r')
         run(['ip', '-6', 'addr', 'add', 'fd43::1/64', 'dev', 'wan', 'nodad'], 'p6r')
-        for ns in ['p6a', 'p6b']:
+        for ns in ['p6a', 'p6b', 'p6c']:
             run(['ip', 'route', 'add', 'default', 'via', '192.0.2.1'], ns)
             run(['ip', '-6', 'route', 'add', 'default', 'via', 'fd42::1'], ns)
         run(['ip', 'route', 'add', '192.0.2.0/24', 'via', '198.51.100.1'], 'p6w')
@@ -329,6 +434,7 @@ while time.monotonic()<end:
             assert passwall == run(['nft', '-s', 'list', 'table', 'inet', 'passwall'], 'p6r').stdout
             print('PASS: empty policy, repeat apply and unrelated firewall tables', flush=True)
             router_advertisements()
+            lan_communication()
     except Exception:
         for ns in ['p6a', 'p6r', 'p6w']:
             for command in [['ip', '-6', 'route'], ['ip', '-6', 'neigh'], ['nft', 'list', 'ruleset']]:

@@ -10,8 +10,8 @@ msgstr "升级或更改 IPv6 权限后，请将受影响的设备断开并重新
 msgid "IPv6 network settings could not be applied."
 msgstr "IPv6 网络设置未能生效。"
 
-msgid "Allow IPv6"
-msgstr "允许 IPv6"
+msgid "Allow IPv6 Internet access"
+msgstr "允许 IPv6 上网"
 
 msgid "Application was cancelled or did not complete."
 msgstr "应用已取消或未完成。"
@@ -40,8 +40,8 @@ msgstr "IPv6 白名单保护已生效，允许 %s 台设备。"
 msgid "IPv6 protection is not active."
 msgstr "IPv6 白名单保护尚未启用。"
 
-msgid "LAN devices and IPv6 permissions"
-msgstr "局域网设备与 IPv6 权限"
+msgid "LAN devices and IPv6 Internet permissions"
+msgstr "局域网设备与 IPv6 上网权限"
 
 msgid "Lease or saved entry; presence unknown"
 msgstr "租约或已保存设备；在线状态未知"
@@ -52,8 +52,8 @@ msgstr "暂未发现设备。"
 msgid "Not known"
 msgstr "尚未知晓"
 
-msgid "Only selected devices may use IPv6 through this router. IPv4 remains available."
-msgstr "仅勾选的设备可以通过本路由器使用 IPv6，IPv4 仍然可用。"
+msgid "Only selected devices may access other networks using IPv6. Communication between LAN devices and IPv4 remain available."
+msgstr "只有勾选的设备可以通过 IPv6 访问其他网络。局域网设备之间的通信和 IPv4 继续可用。"
 
 msgid "Permission denied."
 msgstr "没有操作权限。"
@@ -97,5 +97,5 @@ msgstr "未知设备"
 msgid "Unsaved changes."
 msgstr "有尚未保存的修改。"
 
-msgid "Unselected devices may still display automatically generated IPv6 addresses. These addresses do not grant IPv6 access through this router."
-msgstr "未勾选的设备仍可能显示自动生成的 IPv6 地址，但不能凭这些地址通过本路由器使用 IPv6。"
+msgid "Unselected devices may still have IPv6 addresses for local communication. These addresses do not grant access to other networks."
+msgstr "未勾选的设备仍可能具有用于本地通信的 IPv6 地址，但不能据此访问其他网络。"

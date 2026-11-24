@@ -50,9 +50,9 @@ return view.extend({
 		this.body = E('tbody');
 		this.empty = E('p', {}, _('No devices have been discovered yet.'));
 		const table = E('table', { 'class': 'table', 'aria-describedby': 'passipv6-description' }, [
-			E('caption', {}, _('LAN devices and IPv6 permissions')),
+			E('caption', {}, _('LAN devices and IPv6 Internet permissions')),
 			E('thead', {}, E('tr', { 'class': 'tr' }, [
-				_('Allow IPv6'), _('Device / MAC address'), _('IPv4 addresses'),
+				_('Allow IPv6 Internet access'), _('Device / MAC address'), _('IPv4 addresses'),
 				_('IPv6 addresses'), _('Discovery status')
 			].map(title => E('th', { 'scope': 'col', 'class': 'th' }, title)))),
 			this.body
@@ -72,8 +72,8 @@ return view.extend({
 				.passipv6-actions button:focus-visible{outline:2px solid #111;outline-offset:2px;box-shadow:0 0 0 4px #fff}
 			`),
 			E('h2', {}, 'PassIPV6'),
-			E('p', { 'id': 'passipv6-description' }, _('Only selected devices may use IPv6 through this router. IPv4 remains available.')),
-			E('p', {}, _('Unselected devices may still display automatically generated IPv6 addresses. These addresses do not grant IPv6 access through this router.')),
+			E('p', { 'id': 'passipv6-description' }, _('Only selected devices may access other networks using IPv6. Communication between LAN devices and IPv4 remain available.')),
+			E('p', {}, _('Unselected devices may still have IPv6 addresses for local communication. These addresses do not grant access to other networks.')),
 			E('p', {}, _('After upgrading or changing IPv6 permissions, reconnect affected devices once to refresh their network settings.')),
 			E('p', {}, _('Devices refresh every 5 seconds. Offline allowlist entries are kept.')),
 			this.message, this.error, table, this.empty
@@ -151,8 +151,8 @@ return view.extend({
 				const ips6 = E('td', { 'class': 'td', 'data-title': _('IPv6 addresses') });
 				const seen = E('td', { 'class': 'td', 'data-title': _('Discovery status') });
 				const tr = E('tr', { 'class': 'tr' }, [
-					E('td', { 'class': 'td', 'data-title': _('Allow IPv6') },
-						E('label', { 'for': id }, [checkbox, E('span', { 'id': id + '-label' }, _('Allow IPv6'))])),
+					E('td', { 'class': 'td', 'data-title': _('Allow IPv6 Internet access') },
+						E('label', { 'for': id }, [checkbox, E('span', { 'id': id + '-label' }, _('Allow IPv6 Internet access'))])),
 					E('th', { 'scope': 'row', 'class': 'td', 'id': id + '-device' },
 						[name, E('span', { 'class': 'mac' }, mac.toUpperCase())]), ips4, ips6, seen
 				]);

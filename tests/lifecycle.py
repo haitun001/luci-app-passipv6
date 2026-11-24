@@ -95,14 +95,24 @@ run('/usr/libexec/passipv6', 'reload')
 assert status()['applied']
 print('PASS: failed helper commit restores both tables, active RA snapshot and last-good configuration', flush=True)
 
-table = json.loads(run('nft', '-j', 'list', 'table', 'bridge', 'passipv6').stdout)
-guard = next(e['rule'] for e in table['nftables'] if e.get('rule', {}).get('comment') == 'passipv6-ra-guard')
-run('nft', 'replace', 'rule', 'bridge', 'passipv6', 'lan_postrouting', 'handle', str(guard['handle']),
-    'counter', 'accept', 'comment', '"passipv6-ra-guard"')
-assert not status()['active'], 'A rule count and comment are not proof of an active RA guard'
+for family in ['inet', 'bridge']:
+    original = json.loads(run('nft', '-j', 'list', 'table', family, 'passipv6').stdout)
+    for index in range(sum('rule' in entry for entry in original['nftables'])):
+        table = json.loads(run('nft', '-j', 'list', 'table', family, 'passipv6').stdout)
+        rule = [entry['rule'] for entry in table['nftables'] if 'rule' in entry][index]
+        command = ['nft', 'replace', 'rule', family, 'passipv6', rule['chain'],
+                   'handle', str(rule['handle']), 'counter', 'accept']
+        if rule.get('comment'):
+            command.extend(['comment', '"' + rule['comment'] + '"'])
+        run(*command)
+        assert not status()['active'], f'Replaced {family}/{rule["chain"]} rule was accepted'
+        run('/usr/libexec/passipv6', 'reload')
+        assert status()['applied']
+run('nft', 'delete', 'element', 'bridge', 'passipv6', 'lan_ports', '{', '"eth0"', '}')
+assert not status()['active'], 'Missing protected bridge ports must be detected'
 run('/usr/libexec/passipv6', 'reload')
 assert status()['applied']
-print('PASS: status detects a replaced multicast guard even with unchanged rule count', flush=True)
+print('PASS: status detects replaced ingress, egress, RA and DHCPv6 rules with unchanged rule counts, and missing LAN ports', flush=True)
 
 daemon = helper_pid()
 assert daemon
