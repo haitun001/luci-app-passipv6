@@ -126,3 +126,10 @@ References:
   preserved; IPv4 HTTPS/DNS and live RA capture/copy/guard counters passed.
   The reference user confirmed normal iPhone connectivity after one Wi-Fi reconnect.
   Other iOS versions, physical clients and sleep/wake behavior require separate checks.
+- Version 1.2.0 separates LAN switching from routed IPv6 access. Isolated native
+  tests passed across distinct LAN bridge ports, including discovery transports,
+  fresh NDP/DAD, multicast snooping on/off, real offload revocation and RA/DHCPv6
+  protection. The same LAN regression fails under the extracted 1.1.0 policy.
+  Candidate upgrade/reinstall and lifecycle tests passed; production candidate
+  checks preserved configuration and unrelated services. HomePod playback
+  acceptance is still pending and must not be claimed from transport tests alone.

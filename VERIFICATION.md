@@ -10,6 +10,8 @@
   transport matrix exercised IPv4/IPv6 mDNS, SSDP, LLMNR and PTP multicast
   addresses/ports with both unicast and multicast replies and snooping on/off.
   These are transport tests, not implementations of all those application protocols.
+- Running the same regression against the extracted 1.1.0 policy reproduced the
+  denied-client IPv6 peer failure across LAN bridge ports; 1.2.0 passed that path.
 - Actual software-OFFLOAD TCP/UDP flows stopped in both directions on revocation.
   Unauthorized routed IPv6 and DHCPv6 allocation remained blocked; authorized
   IPv6, DHCPv6 and RA/PIO/RDNSS renewal passed. Empty allowlists, stale helper
@@ -22,9 +24,21 @@
   responses. AnyAirPlay's saved target can remain visible with "waiting for device"
   even when discovery has not resolved it. This does not establish that PassIPV6
   caused the complete reported application failure.
-- Package upgrade/reinstall, production deployment and physical HomePod playback
-  acceptance for this version are pending. Do not infer those results from packet
-  tests or from the older releases below.
+- Native candidate packages passed upgrade from 1.1.0 and same-version reinstall
+  with the populated configuration and fw4 preserved. Invalid configuration,
+  concurrent apply, firewall lifecycle, helper commit rollback, failure/recovery,
+  changed program supervision and reboot recovery passed in the isolated VM.
+  Uninstall removed the owned tables/include without changing fw4; reinstall
+  restored the preserved configuration and active policy.
+  Replacing each ingress, output, RA or DHCPv6 rule with accept, or removing a LAN
+  port from the protected set, caused status to reject the policy as intended.
+- Native Bootstrap LuCI passed page-scope axe WCAG 2.2 AA checks in English at
+  1280px and Simplified Chinese at 320px, with no horizontal page overflow.
+- Candidate deployment preserved the production allowlist, checked configuration
+  hashes, unrelated rule structure and tracked service PIDs. Policy status, helper
+  readiness, IPv4 HTTPS and local DNS passed. However, the user still reported
+  HomePod discovery/connection failures. Physical application acceptance remains
+  pending; candidate installation is not evidence of restored playback.
 
 ## 1.1.0
 
