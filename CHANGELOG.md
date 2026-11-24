@@ -6,11 +6,13 @@
 - 在 LAN 桥主设备入口及桥输出路径限制未授权路由流量，继续保护 RA、DHCPv6 和已有软件加速连接的撤权。
 - 应用状态核对关键规则内容、hook、接口和端口集合；保持已有白名单、原子应用和辅助进程回退。
 - 增加跨 LAN 桥端口的发现传输、邻居发现、地址冲突检测和组播加入回归测试；实际应用兼容性以验证记录为准。
+- 已验证从 1.0.2 直接升级并保留现有配置。实体 HomePod 播放验收仍待完成，本版不宣称解决所有 AirPlay 连接故障。
 
 - Preserve IPv6 communication and discovery between devices on the same LAN while restricting routed IPv6 access by MAC.
 - Filter before software flow offload on the bridge master and block routed replies at bridge output; retain RA and DHCPv6 protection.
 - Validate actual filtering expressions, hooks and interfaces before reporting an active policy. Existing configuration and rollback remain supported.
 - Add packet regressions across separate LAN bridge ports. See the verification record for the tested application and hardware limits.
+- Verify direct upgrade from 1.0.2 while preserving existing configuration. Physical HomePod playback acceptance remains pending; this release does not claim to resolve every AirPlay connection failure.
 
 ## 1.1.0
 

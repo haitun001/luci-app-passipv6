@@ -9,6 +9,7 @@
 **1.2.0：保留局域网 IPv6 通信与设备发现，继续按白名单限制 IPv6 路由访问。**
 这明确改变了旧版对跨 LAN 桥端口 IPv6 通信的全面封锁：未勾选设备也可在同一 LAN 内通信。
 RA 和 DHCPv6 配置分发仍受限制，未勾选设备不能经路由器访问其他 IPv6 网络。
+已验证从 1.0.2 直接升级并保留配置。实体 HomePod 播放验收仍待完成，详见验证记录。
 升级或修改权限后，请将受影响设备断开并重新连接一次，以刷新旧路由和 DNS。
 参考用户已确认 iPhone 重连后恢复正常；更多机型、系统版本和休眠唤醒场景仍需验证。
 
@@ -150,7 +151,8 @@ are mandatory; hardware offload and direct bridge-port flowtable offload are uns
 Version 1.2.0 separates LAN switching from routed IPv6 access, including link-local, ULA and
 global addresses used between LAN peers. This intentionally replaces the earlier blanket
 blocking of IPv6 across LAN bridge ports. Router-local IPv6 services retain their previous
-restrictions. The policy still delivers locally generated RAs to allowlisted Ethernet addresses and blocks their
+restrictions. Direct upgrade from 1.0.2 preserved existing configuration; physical HomePod
+playback acceptance remains pending. The policy still delivers locally generated RAs to allowlisted Ethernet addresses and blocks their
 original multicast copies, preserving the existing subnet, AP layout and odhcpd configuration.
 The native helper is supervised by procd; application is confirmed only when filtering and RA
 delivery agree. A helper failure keeps the multicast guard in place and is reported as an error.

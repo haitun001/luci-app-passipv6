@@ -130,6 +130,8 @@ References:
   tests passed across distinct LAN bridge ports, including discovery transports,
   fresh NDP/DAD, multicast snooping on/off, real offload revocation and RA/DHCPv6
   protection. The same LAN regression fails under the extracted 1.1.0 policy.
-  Candidate upgrade/reinstall and lifecycle tests passed; production candidate
-  checks preserved configuration and unrelated services. HomePod playback
-  acceptance is still pending and must not be claimed from transport tests alone.
+  Candidate upgrade/reinstall and lifecycle tests passed; production checks,
+  including a direct 1.0.2-r1 to 1.2.0-r1 upgrade, preserved configuration and
+  unrelated services. HomePod failures also persisted with both plugin tables
+  removed and its helper stopped. Physical playback acceptance is still pending
+  and must not be claimed from transport tests or a successful deployment alone.

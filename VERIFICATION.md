@@ -39,6 +39,15 @@
   readiness, IPv4 HTTPS and local DNS passed. However, the user still reported
   HomePod discovery/connection failures. Physical application acceptance remains
   pending; candidate installation is not evidence of restored playback.
+- The user also reported the connection/discovery failures with the helper stopped
+  and both PassIPV6 tables removed. This comparison does not establish PassIPV6 as
+  the cause, and the release makes no claim that physical HomePod playback is fixed.
+- A subsequent production deployment upgraded 1.0.2-r1 directly to 1.2.0-r1 on
+  the supported platform. The existing empty allowlist, checked configuration
+  hashes, unrelated rule structure and tracked service PIDs were preserved.
+  Native status and RPC both confirmed active filtering, applied configuration
+  and RA readiness; service autostart was enabled. Uploaded APK checksums matched
+  the successful CI build, and the deployment staging directory was removed.
 
 ## 1.1.0
 
